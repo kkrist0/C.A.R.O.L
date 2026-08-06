@@ -218,16 +218,20 @@ const countryRegion = (nm) => (COUNTRY_META[nm] ? COUNTRY_META[nm][2] : "");
 
 const n = (v) => { const x = Number(String(v ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(x) ? x : 0; };
 const s = (v) => (v == null ? "" : String(v));
+const splitGroups = (v) => (v == null ? [] : String(v).split(/[|,]/).map((g) => g.trim()).filter(Boolean));
+const getCategoryGroups = (cat) => (cat ? splitGroups(cat.gruppo) : []);
+const getCategoryGroupLabel = (cat) => { const groups = getCategoryGroups(cat); return groups.length > 1 ? groups.join(" / ") : groups[0] || "Wants"; };
+const getTxGroup = (tx, catById) => (tx?.gruppo || (tx?.categoria ? getCategoryGroups(catById?.[tx.categoria])[0] : "") || "");
 
 /** Schema dei fogli: ogni entità sa come diventare righe e come tornare oggetti. */
 const SHEET_SCHEMA = {
   transactions: {
     sheet: "Movimenti",
-    headers: ["ID", "Data", "Tipo", "Categoria", "Sottocategoria", "Importo", "Conto", "ContoDestinazione", "Metodo", "Descrizione", "Tag", "EliminatoIl"],
-    pack: (st) => st.transactions.map((t) => [t.id, t.data, t.tipo, s(t.categoria), s(t.sottocategoria), t.importo, s(t.conto), s(t.contoDest), s(t.metodo), s(t.note), (t.tags || []).join("|"), s(t.deletedAt)]),
+    headers: ["ID", "Data", "Tipo", "Categoria", "Sottocategoria", "Importo", "Conto", "ContoDestinazione", "Metodo", "Descrizione", "Tag", "Gruppo", "EliminatoIl"],
+    pack: (st) => st.transactions.map((t) => [t.id, t.data, t.tipo, s(t.categoria), s(t.sottocategoria), t.importo, s(t.conto), s(t.contoDest), s(t.metodo), s(t.note), (t.tags || []).join("|"), s(t.gruppo), s(t.deletedAt)]),
     unpack: (rows) => rows.filter((r) => s(r[0])).map((r) => {
-      const t = { id: s(r[0]), data: s(r[1]).slice(0, 10), tipo: s(r[2]) || "spesa", categoria: s(r[3]) || null, sottocategoria: s(r[4]), importo: n(r[5]), conto: s(r[6]), contoDest: s(r[7]) || undefined, metodo: s(r[8]), note: s(r[9]), tags: s(r[10]) ? s(r[10]).split("|").filter(Boolean) : [] };
-      if (s(r[11])) t.deletedAt = s(r[11]);
+      const t = { id: s(r[0]), data: s(r[1]).slice(0, 10), tipo: s(r[2]) || "spesa", categoria: s(r[3]) || null, sottocategoria: s(r[4]), importo: n(r[5]), conto: s(r[6]), contoDest: s(r[7]) || undefined, metodo: s(r[8]), note: s(r[9]), tags: s(r[10]) ? s(r[10]).split("|").filter(Boolean) : [], gruppo: s(r[11]) || undefined };
+      if (s(r[12])) t.deletedAt = s(r[12]);
       return t;
     }),
   },
@@ -789,7 +793,7 @@ function App() {
   const normalize = useCallback((d) => {
     if (!d.trash) d.trash = [];
     if (!d.settings) d.settings = { theme: "dark", onboarded: false };
-    if (!d.groups || !d.groups.length) d.groups = [...new Set((d.categories || []).map((c) => c.gruppo))];
+    if (!d.groups || !d.groups.length) d.groups = [...new Set((d.categories || []).flatMap((c) => getCategoryGroups(c)))];
     (d.categories || []).forEach((c, i) => { if (c.ordine == null) c.ordine = i; if (!c.sottocategorie) c.sottocategorie = []; });
     (d.accounts || []).forEach((a) => { if (!a.icona) a.icona = ACCOUNT_ICON_BY_TYPE[a.tipo] || "💼"; });
     if (!d.budgets) d.budgets = {};
@@ -953,7 +957,7 @@ function App() {
   }, [txs, data]);
 
   const patrimonio = useMemo(() => Object.values(balances).reduce((s, v) => s + v, 0), [balances]);
-  const investito = useMemo(() => txs.filter((t) => t.tipo === "spesa" && catById[t.categoria]?.gruppo === "Investimenti").reduce((s, t) => s + t.importo, 0), [txs, catById]);
+  const investito = useMemo(() => txs.filter((t) => t.tipo === "spesa" && getTxGroup(t, catById) === "Investimenti").reduce((s, t) => s + t.importo, 0), [txs, catById]);
 
   const nowMk = monthKey(new Date());
   const [selMonth, setSelMonth] = useState(nowMk);
@@ -967,8 +971,8 @@ function App() {
   const monthStats = useCallback((mk) => {
     const mt = txs.filter((t) => monthKey(t.data) === mk);
     const entrate = mt.filter((t) => t.tipo === "entrata").reduce((s, t) => s + t.importo, 0);
-    const uscite = mt.filter((t) => t.tipo === "spesa" && catById[t.categoria]?.gruppo !== "Investimenti").reduce((s, t) => s + t.importo, 0);
-    const inv = mt.filter((t) => t.tipo === "spesa" && catById[t.categoria]?.gruppo === "Investimenti").reduce((s, t) => s + t.importo, 0);
+    const uscite = mt.filter((t) => t.tipo === "spesa" && getTxGroup(t, catById) !== "Investimenti").reduce((s, t) => s + t.importo, 0);
+    const inv = mt.filter((t) => t.tipo === "spesa" && getTxGroup(t, catById) === "Investimenti").reduce((s, t) => s + t.importo, 0);
     return { entrate, uscite, inv, risparmio: entrate - uscite - inv, mt };
   }, [txs, catById]);
   const cur = monthStats(selMonth);
@@ -1105,7 +1109,7 @@ function App() {
   };
   const exportXLSX = () => {
     const wb = XLSX.utils.book_new();
-    const movRows = txs.map((t) => ({ Data: t.data, Tipo: t.tipo, Categoria: catById[t.categoria]?.nome || "", Gruppo: catById[t.categoria]?.gruppo || "", Conto: accById[t.conto]?.nome || "", Importo: t.tipo === "spesa" ? -t.importo : t.importo, Metodo: t.metodo || "", Note: t.note || "" }));
+    const movRows = txs.map((t) => ({ Data: t.data, Tipo: t.tipo, Categoria: catById[t.categoria]?.nome || "", Gruppo: getTxGroup(t, catById) || "", Conto: accById[t.conto]?.nome || "", Importo: t.tipo === "spesa" ? -t.importo : t.importo, Metodo: t.metodo || "", Note: t.note || "" }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(movRows), "Movimenti");
     const contiRows = (data.accounts || []).map((a) => ({ Conto: a.nome, Tipo: a.tipo, "Saldo iniziale": a.saldoIniziale, "Saldo attuale": Math.round((balances[a.id] || 0) * 100) / 100 }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(contiRows), "Conti");
@@ -6287,6 +6291,7 @@ const COLOR_SET = ["#8B9DF9", "#A5B4FC", "#C4B5FD", "#F0ABFC", "#F9A8D4", "#FDA4
 function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor }) {
   const [newGroup, setNewGroup] = useState("");
   const dragId = useRef(null);
+  const dragModeRef = useRef("move");
   const [dragOver, setDragOver] = useState(null);
 
   const usage = useMemo(() => {
@@ -6298,13 +6303,18 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
   const byGroup = useMemo(() => {
     const m = {};
     data.groups.forEach((g) => (m[g] = []));
-    [...data.categories].sort((a, b) => a.ordine - b.ordine).forEach((c) => { (m[c.gruppo] = m[c.gruppo] || []).push(c); });
+    [...data.categories].sort((a, b) => a.ordine - b.ordine).forEach((c) => {
+      const groups = getCategoryGroups(c);
+      groups.forEach((g) => { (m[g] = m[g] || []).push(c); });
+    });
     return m;
   }, [data]);
 
   const onDrop = (targetId, targetGroup) => {
     const id = dragId.current;
+    const mode = dragModeRef.current;
     dragId.current = null;
+    dragModeRef.current = "move";
     setDragOver(null);
     if (!id || id === targetId) return;
     update((d) => {
@@ -6312,7 +6322,11 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
       const dragged = ordered.find((c) => c.id === id);
       if (!dragged) return d;
       const rest = ordered.filter((c) => c.id !== id);
-      dragged.gruppo = targetGroup;
+      const groups = getCategoryGroups(dragged).filter(Boolean);
+      const nextGroups = mode === "copy"
+        ? [...new Set([...groups, targetGroup].filter(Boolean))]
+        : (groups.includes(targetGroup) ? groups.filter((g) => g !== targetGroup && g !== "") : [targetGroup]);
+      dragged.gruppo = nextGroups.join("|");
       const idx = targetId ? rest.findIndex((c) => c.id === targetId) : rest.length;
       rest.splice(idx < 0 ? rest.length : idx, 0, dragged);
       rest.forEach((c, i) => { const orig = d.categories.find((x) => x.id === c.id); orig.ordine = i; orig.gruppo = c.gruppo; });
@@ -6320,12 +6334,30 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
     });
   };
 
-  const deleteCat = (c) => setConfirmDlg({
-    msg: usage[c.id]
-      ? `"${c.nome}" è usata in ${usage[c.id]} movimenti: verranno mantenuti nello storico come "Senza categoria". Eliminare la categoria?`
-      : `Eliminare la categoria "${c.nome}"?`,
-    onOk: () => { update((d) => { d.categories = d.categories.filter((x) => x.id !== c.id); delete d.budgets[c.id]; return d; }); notify("Categoria eliminata"); },
-  });
+  const removeCatFromGroup = (c, g) => {
+    const groups = getCategoryGroups(c).filter((x) => x !== g);
+    const msg = groups.length
+      ? `Rimuovere "${c.nome}" solo dal gruppo "${g}"? Rimarrà disponibile nei gruppi: ${groups.join(", ")}.`
+      : `Rimuovere "${c.nome}" da "${g}"? Non resterà in nessun gruppo, quindi verrà eliminata completamente.`;
+    setConfirmDlg({
+      msg,
+      onOk: () => {
+        update((d) => {
+          const cat = d.categories.find((x) => x.id === c.id);
+          if (!cat) return d;
+          const nextGroups = getCategoryGroups(cat).filter((x) => x !== g);
+          if (nextGroups.length) {
+            cat.gruppo = nextGroups.join("|");
+          } else {
+            d.categories = d.categories.filter((x) => x.id !== c.id);
+            delete d.budgets[c.id];
+          }
+          return d;
+        });
+        notify(groups.length ? `Categoria rimossa da "${g}"` : `Categoria eliminata`);
+      },
+    });
+  };
 
   const deleteGroup = (g) => {
     if ((byGroup[g] || []).length) { notify("Sposta o elimina prima le categorie del gruppo"); return; }
@@ -6341,7 +6373,7 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
         </div>
         <BtnPrimary onClick={() => setCatEditor({})}>+ Nuova</BtnPrimary>
       </header>
-      <p className="text-xs text-slate-500 mb-4" style={{ animation: "fadeUp .5s both", animationDelay: "60ms" }}>Trascina le categorie per riordinarle o spostarle in un altro gruppo. Tocca una categoria per modificarla.</p>
+      <p className="text-xs text-slate-500 mb-4" style={{ animation: "fadeUp .5s both", animationDelay: "60ms" }}>Trascina la scheda per spostarla in un altro gruppo; trascina l'icona ⧉ per duplicarla in un altro gruppo. Tocca una categoria per modificarla.</p>
 
       {data.groups.map((g, gi) => (
         <Card key={g} className="p-4 mb-4" hover={false} delay={80 + gi * 60}>
@@ -6354,7 +6386,7 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
               <div
                 key={c.id}
                 draggable
-                onDragStart={() => (dragId.current = c.id)}
+                onDragStart={(e) => { e.stopPropagation(); dragId.current = c.id; dragModeRef.current = "move"; }}
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(c.id); }}
                 onDragLeave={() => setDragOver((x) => (x === c.id ? null : x))}
                 onDrop={(e) => { e.stopPropagation(); onDrop(c.id, g); }}
@@ -6370,7 +6402,15 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
                   </p>
                 </div>
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.colore }} />
-                <button onClick={(e) => { e.stopPropagation(); deleteCat(c); }} className="w-7 h-7 rounded-lg text-xs text-slate-500 opacity-0 group-hover:opacity-100 hover:bg-rose-500/20 hover:text-rose-300 transition-all">🗑</button>
+                <span
+                  draggable
+                  title="Trascina per aggiungere questo gruppo"
+                  onDragStart={(e) => { e.stopPropagation(); dragId.current = c.id; dragModeRef.current = "copy"; }}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(c.id); }}
+                  onDrop={(e) => { e.stopPropagation(); onDrop(c.id, g); }}
+                  className="w-7 h-7 rounded-lg grid place-items-center text-xs text-slate-400 opacity-70 hover:opacity-100 hover:bg-white/10 transition-all cursor-copy"
+                >⧉</span>
+                <button onClick={(e) => { e.stopPropagation(); removeCatFromGroup(c, g); }} className="w-7 h-7 rounded-lg text-xs text-slate-500 opacity-0 group-hover:opacity-100 hover:bg-rose-500/20 hover:text-rose-300 transition-all" title={`Rimuovi da ${g}`}>🗑</button>
               </div>
             ))}
             {(byGroup[g] || []).length === 0 && <p className="text-xs text-slate-600 py-2 px-2">Gruppo vuoto: trascina qui una categoria.</p>}
@@ -6395,7 +6435,8 @@ function CatModal({ open, cat, prefillName, prefillGroup, onClose, data, update,
   const [subInput, setSubInput] = useState("");
   useEffect(() => {
     if (open) {
-      setF({ nome: cat?.nome || prefillName || "", gruppo: cat?.gruppo || prefillGroup || data.groups[0], icona: cat?.icona || "✨", colore: cat?.colore || "#8B9DF9", sottocategorie: [...(cat?.sottocategorie || [])], budget: cat?.id && data.budgets[cat.id] ? String(data.budgets[cat.id]) : "" });
+      const initialGroups = getCategoryGroups(cat).length ? getCategoryGroups(cat) : (prefillGroup ? [prefillGroup] : (data.groups[0] ? [data.groups[0]] : []));
+      setF({ nome: cat?.nome || prefillName || "", gruppi: initialGroups, icona: cat?.icona || "✨", colore: cat?.colore || "#8B9DF9", sottocategorie: [...(cat?.sottocategorie || [])], budget: cat?.id && data.budgets[cat.id] ? String(data.budgets[cat.id]) : "" });
       setSubInput("");
     }
   }, [open, cat, prefillName, prefillGroup, data]);
@@ -6406,12 +6447,13 @@ function CatModal({ open, cat, prefillName, prefillGroup, onClose, data, update,
     if (!f.nome.trim()) return;
     let id = cat?.id;
     update((d) => {
+      const gruppi = (f.gruppi || []).filter(Boolean);
       if (isEdit) {
         const c = d.categories.find((x) => x.id === id);
-        Object.assign(c, { nome: f.nome.trim(), gruppo: f.gruppo, icona: f.icona, colore: f.colore, sottocategorie: f.sottocategorie });
+        Object.assign(c, { nome: f.nome.trim(), gruppo: gruppi.join("|"), icona: f.icona, colore: f.colore, sottocategorie: f.sottocategorie });
       } else {
         id = uid();
-        d.categories.push({ id, nome: f.nome.trim(), gruppo: f.gruppo, icona: f.icona, colore: f.colore, sottocategorie: f.sottocategorie, ordine: Math.max(-1, ...d.categories.map((c) => c.ordine)) + 1 });
+        d.categories.push({ id, nome: f.nome.trim(), gruppo: gruppi.join("|"), icona: f.icona, colore: f.colore, sottocategorie: f.sottocategorie, ordine: Math.max(-1, ...d.categories.map((c) => c.ordine)) + 1 });
       }
       const b = Number(f.budget);
       if (b > 0) d.budgets[id] = b; else delete d.budgets[id];
@@ -6431,7 +6473,16 @@ function CatModal({ open, cat, prefillName, prefillGroup, onClose, data, update,
     <Modal open={open} onClose={onClose} title={isEdit ? "Modifica categoria" : "Nuova categoria"} wide>
       <div className="grid sm:grid-cols-2 gap-4">
         <div><Label>Nome</Label><Input value={f.nome} onChange={(e) => set("nome", e.target.value)} placeholder="es. Palestra" autoFocus /></div>
-        <div><Label>Gruppo</Label><Select value={f.gruppo} onChange={(e) => set("gruppo", e.target.value)}>{data.groups.map((g) => <option key={g}>{g}</option>)}</Select></div>
+        <div><Label>Gruppi</Label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {data.groups.map((g) => (
+              <label key={g} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-xs transition-all ${f.gruppi.includes(g) ? "border-indigo-400/60 bg-indigo-400/15 text-white" : "border-white/10 bg-white/5 text-slate-400"}`}>
+                <input type="checkbox" checked={f.gruppi.includes(g)} onChange={(e) => set("gruppi", e.target.checked ? [...f.gruppi, g] : f.gruppi.filter((x) => x !== g))} />
+                <span>{g}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="mt-4"><Label>Icona</Label>
         <div className="grid grid-cols-8 sm:grid-cols-11 gap-1.5">
@@ -6480,7 +6531,7 @@ function BudgetPage({ data, update, cur, catById, notify }) {
   const [editVal, setEditVal] = useState("");
   const spentFor = (k) => cur.mt.filter((t) => t.tipo === "spesa" && t.categoria === k).reduce((s, t) => s + t.importo, 0);
   const entries = Object.entries(data.budgets || {});
-  const spendCats = data.categories.filter((c) => c.gruppo !== "Entrate");
+  const spendCats = data.categories.filter((c) => !getCategoryGroups(c).includes("Entrate"));
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -7422,9 +7473,9 @@ function CategoryPicker({ data, value, tipoEntrata, onSelect, onEditCat, onCreat
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 40); else setQ(""); }, [open]);
 
   const sel = data.categories.find((c) => c.id === value);
-  const cats = [...data.categories].sort((a, b) => a.ordine - b.ordine).filter((c) => (tipoEntrata ? c.gruppo === "Entrate" : c.gruppo !== "Entrate"));
+  const cats = [...data.categories].sort((a, b) => a.ordine - b.ordine).filter((c) => (tipoEntrata ? getCategoryGroups(c).includes("Entrate") : !getCategoryGroups(c).includes("Entrate")));
   const ql = q.trim().toLowerCase();
-  const filtered = ql ? cats.filter((c) => c.nome.toLowerCase().includes(ql) || c.gruppo.toLowerCase().includes(ql)) : cats;
+  const filtered = ql ? cats.filter((c) => c.nome.toLowerCase().includes(ql) || getCategoryGroupLabel(c).toLowerCase().includes(ql)) : cats;
   const exactMatch = cats.some((c) => c.nome.toLowerCase() === ql);
   const canCreate = ql.length > 0 && !exactMatch;
 
@@ -7445,7 +7496,7 @@ function CategoryPicker({ data, value, tipoEntrata, onSelect, onEditCat, onCreat
           <>
             <span className="w-6 h-6 rounded-lg grid place-items-center text-sm" style={{ background: sel.colore + "1f", border: `1px solid ${sel.colore}33` }}>{sel.icona}</span>
             <span className="text-white">{sel.nome}</span>
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider">{sel.gruppo}</span>
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">{getCategoryGroupLabel(sel)}</span>
           </>
         ) : (
           <span className="text-slate-500">Cerca o crea una categoria…</span>
@@ -7461,7 +7512,7 @@ function CategoryPicker({ data, value, tipoEntrata, onSelect, onEditCat, onCreat
               <div key={c.id} className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${value === c.id ? "bg-indigo-400/15" : "hover:bg-white/[0.07]"}`} onClick={() => pick(c.id)}>
                 <span className="w-6 h-6 rounded-lg grid place-items-center text-sm shrink-0" style={{ background: c.colore + "1f", border: `1px solid ${c.colore}33` }}>{c.icona}</span>
                 <span className="text-sm text-slate-200 truncate">{c.nome}</span>
-                <span className="text-[10px] text-slate-600 uppercase tracking-wider">{c.gruppo}</span>
+                <span className="text-[10px] text-slate-600 uppercase tracking-wider">{getCategoryGroupLabel(c)}</span>
                 {c.sottocategorie?.length > 0 && <span className="text-[10px] text-slate-600">· {c.sottocategorie.length} sub</span>}
                 <button type="button" onClick={(e) => { e.stopPropagation(); onEditCat(c); setOpen(false); }} title="Modifica categoria" className="ml-auto w-6 h-6 rounded-md text-xs text-slate-500 opacity-0 group-hover:opacity-100 hover:bg-white/10 hover:text-white transition-all shrink-0">✎</button>
               </div>
@@ -7490,11 +7541,14 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
   const isEdit = !!tx?.id;
   const [form, setForm] = useState(null);
   useEffect(() => {
-    if (open) setForm({ tipo: tx?.tipo || "spesa", importo: tx?.importo || "", data: tx?.data || todayISO(), categoria: tx?.categoria || "", sottocategoria: tx?.sottocategoria || "", conto: tx?.conto || data.accounts[0]?.id || "", contoDest: tx?.contoDest || data.accounts[1]?.id || "", metodo: tx?.metodo || "Carta", note: tx?.note || "", tags: (tx?.tags || []).join(", "), id: tx?.id });
+    if (open) setForm({ tipo: tx?.tipo || "spesa", importo: tx?.importo || "", data: tx?.data || todayISO(), categoria: tx?.categoria || "", gruppo: tx?.gruppo || "", sottocategoria: tx?.sottocategoria || "", conto: tx?.conto || data.accounts[0]?.id || "", contoDest: tx?.contoDest || data.accounts[1]?.id || "", metodo: tx?.metodo || "Carta", note: tx?.note || "", tags: (tx?.tags || []).join(", "), id: tx?.id });
   }, [open, tx, data]);
   if (!open || !form) return null;
   const isTr = form.tipo === "trasferimento";
   const selCat = data.categories.find((c) => c.id === form.categoria);
+  const catGroups = getCategoryGroups(selCat);
+  const spendGroups = catGroups.filter((g) => g !== "Entrate");
+  const showGroupSelect = !isTr && form.tipo !== "entrata" && spendGroups.length > 1;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = () => {
@@ -7505,7 +7559,8 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
       onSave({ id: form.id, tipo: "trasferimento", importo, data: form.data, conto: form.conto, contoDest: form.contoDest, categoria: null, sottocategoria: "", metodo: "Trasferimento", note: form.note, tags: [] });
     } else {
       if (!form.categoria) return;
-      onSave({ ...form, contoDest: undefined, importo, tags: form.tags.split(",").map((s) => s.trim()).filter(Boolean) });
+      const gruppo = form.gruppo || (spendGroups[0] || (form.tipo === "entrata" ? "Entrate" : "Wants"));
+      onSave({ ...form, contoDest: undefined, importo, gruppo, tags: form.tags.split(",").map((s) => s.trim()).filter(Boolean) });
     }
   };
 
@@ -7539,11 +7594,22 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
                 data={data}
                 value={form.categoria}
                 tipoEntrata={form.tipo === "entrata"}
-                onSelect={(id) => setForm((f) => ({ ...f, categoria: id, sottocategoria: "" }))}
+                onSelect={(id) => {
+                  const cat = data.categories.find((c) => c.id === id);
+                  const groups = getCategoryGroups(cat);
+                  setForm((f) => ({ ...f, categoria: id, sottocategoria: "", gruppo: groups.includes(f.gruppo) ? f.gruppo : groups[0] || "" }));
+                }}
                 onEditCat={(c) => setCatEditor({ cat: c, onDone: (id) => setForm((f) => ({ ...f, categoria: id })) })}
                 onCreate={(name) => setCatEditor({ prefillName: name, prefillGroup: form.tipo === "entrata" ? "Entrate" : undefined, onDone: (id) => setForm((f) => ({ ...f, categoria: id, sottocategoria: "" })) })}
               />
             </div>
+            {showGroupSelect && (
+              <div style={{ animation: "fadeUp .3s both" }}><Label>Gruppo di spesa</Label>
+                <Select value={form.gruppo || spendGroups[0]} onChange={(e) => set("gruppo", e.target.value)}>
+                  {spendGroups.map((g) => <option key={g} value={g}>{g}</option>)}
+                </Select>
+              </div>
+            )}
             {selCat?.sottocategorie?.length > 0 && (
               <div style={{ animation: "fadeUp .3s both" }}><Label>Sottocategoria</Label>
                 <Select value={form.sottocategoria} onChange={(e) => set("sottocategoria", e.target.value)}>
