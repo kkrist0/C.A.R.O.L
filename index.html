@@ -768,6 +768,8 @@ function App() {
   const [confirmDlg, setConfirmDlg] = useState(null); // {msg, onOk}
   const [palette, setPalette] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [draggedNavId, setDraggedNavId] = useState(null);
   const [syncCfg, setSyncCfg] = useState(DEFAULT_SYNC_CFG);
   const [syncState, setSyncState] = useState("idle"); // idle | pulling | pushing | ok | error
   const [syncError, setSyncError] = useState(null);
@@ -1145,6 +1147,40 @@ function App() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
+  const NAV = [
+    { id: "dashboard", label: "Dashboard", icon: "◈" },
+    { id: "movimenti", label: "Movimenti", icon: "⇄" },
+    { id: "budget", label: "Budget", icon: "◔" },
+    { id: "categorie", label: "Categorie", icon: "❖" },
+    { id: "conti", label: "Conti", icon: "▣" },
+    { id: "viaggi", label: "Viaggi", icon: "✦" },
+    { id: "investimenti", label: "Investimenti", icon: "▲" },
+    { id: "carriera", label: "Stipendio", icon: "◱" },
+    { id: "report", label: "Report", icon: "∿" },
+    { id: "obiettivi", label: "Obiettivi", icon: "◎" },
+    { id: "archivio", label: "Archivio", icon: "🗂" },
+    { id: "impostazioni", label: "Impostazioni", icon: "⚙" },
+  ];
+
+  const orderedNav = useMemo(() => {
+    const saved = (data?.settings?.navOrder || []).filter((id) => NAV.some((n) => n.id === id));
+    const missing = NAV.filter((n) => !saved.includes(n.id)).map((n) => n.id);
+    return [...saved, ...missing].map((id) => NAV.find((n) => n.id === id)).filter(Boolean);
+  }, [data, NAV]);
+
+  const moveNavItem = (sourceId, targetId) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const ids = orderedNav.map((n) => n.id);
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, sourceId);
+    update((d) => { d.settings.navOrder = next; return d; });
+    setDraggedNavId(null);
+  };
+
   /* ---------- Skeleton loading ---------- */
   if (!data) {
     return (
@@ -1166,21 +1202,6 @@ function App() {
     );
   }
 
-  const NAV = [
-    { id: "dashboard", label: "Dashboard", icon: "◈" },
-    { id: "movimenti", label: "Movimenti", icon: "⇄" },
-    { id: "budget", label: "Budget", icon: "◔" },
-    { id: "categorie", label: "Categorie", icon: "❖" },
-    { id: "conti", label: "Conti", icon: "▣" },
-    { id: "viaggi", label: "Viaggi", icon: "✦" },
-    { id: "investimenti", label: "Investimenti", icon: "▲" },
-    { id: "carriera", label: "Stipendio", icon: "◱" },
-    { id: "report", label: "Report", icon: "∿" },
-    { id: "obiettivi", label: "Obiettivi", icon: "◎" },
-    { id: "archivio", label: "Archivio", icon: "🗂" },
-    { id: "impostazioni", label: "Impostazioni", icon: "⚙" },
-  ];
-
   return (
     <div className="min-h-screen bg-[#0A0C12] text-slate-200 font-body overflow-x-hidden">
       <StyleTag />
@@ -1194,19 +1215,32 @@ function App() {
       <div className="relative flex min-h-screen">
         {/* Sidebar */}
         <aside className="hidden md:flex flex-col w-56 shrink-0 p-5 gap-1 border-r border-white/5">
-          <div className="flex items-center gap-2.5 mb-8 px-1" style={{ animation: "fadeUp .5s both" }}>
+          <div className="flex items-center gap-2.5 mb-4 px-1" style={{ animation: "fadeUp .5s both" }}>
             <Logo size={34} />
             <div>
               <span className="font-display text-lg text-white tracking-tight leading-none block">C.A.R.O.L</span>
               <span className="text-[9px] uppercase tracking-[0.22em] text-slate-500">Assistant</span>
             </div>
           </div>
-          {NAV.map((n, i) => (
-            <button key={n.id} onClick={() => setPage(n.id)} className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 ${page === n.id ? "bg-white/[0.08] text-white" : "text-slate-400 hover:text-white hover:bg-white/5 hover:translate-x-0.5"}`} style={{ animation: `fadeUp .5s both`, animationDelay: `${60 + i * 40}ms` }}>
+          {orderedNav.map((n, i) => (
+            <button
+              key={n.id}
+              draggable={reorderMode}
+              onClick={() => { if (reorderMode) return; setPage(n.id); }}
+              onDragStart={() => setDraggedNavId(n.id)}
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={() => moveNavItem(draggedNavId, n.id)}
+              onDragEnd={() => setDraggedNavId(null)}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 ${page === n.id ? "bg-white/[0.08] text-white" : "text-slate-400 hover:text-white hover:bg-white/5 hover:translate-x-0.5"} ${reorderMode ? "cursor-grab" : "cursor-pointer"}`} 
+              style={{ animation: `fadeUp .5s both`, animationDelay: `${60 + i * 40}ms` }}>
               {page === n.id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-gradient-to-b from-indigo-300 to-teal-300" style={{ animation: "fadeIn .25s both" }} />}
+              {reorderMode && <span className="text-slate-500 text-sm">⋮⋮</span>}
               <span className={`text-base transition-opacity ${page === n.id ? "opacity-100" : "opacity-60"}`}>{n.icon}</span>{n.label}
             </button>
           ))}
+          <button onClick={() => setReorderMode((v) => !v)} className="mt-3 px-2 py-1 rounded-full text-[8px] uppercase tracking-[0.28em] text-slate-500/70 hover:text-slate-300 hover:bg-white/5 transition-all self-center w-fit">
+            {reorderMode ? "confirm" : "change order"}
+          </button>
           <div className="mt-auto px-2">
             <button onClick={() => setPalette(true)} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400 hover:bg-white/10 transition-all">
               <span>Cerca ovunque</span><kbd className="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">⌘K</kbd>
@@ -1288,15 +1322,24 @@ function App() {
               <button onClick={() => setMenuOpen(false)} aria-label="Chiudi" className="w-9 h-9 rounded-full bg-white/5 text-slate-300 hover:bg-white/10 transition-all">✕</button>
             </div>
             <nav className="flex flex-col gap-1">
-              {NAV.map((n, i) => (
-                <button key={n.id} onClick={() => { setPage(n.id); setMenuOpen(false); }}
+              {orderedNav.map((n, i) => (
+                <button key={n.id} draggable={reorderMode}
+                  onClick={() => { if (reorderMode) return; setPage(n.id); setMenuOpen(false); }}
+                  onDragStart={() => setDraggedNavId(n.id)}
+                  onDragOver={(e) => { e.preventDefault(); }}
+                  onDrop={() => moveNavItem(draggedNavId, n.id)}
+                  onDragEnd={() => setDraggedNavId(null)}
                   className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${page === n.id ? "bg-white/[0.09] text-white" : "text-slate-400 active:bg-white/5"}`}
                   style={{ animation: "fadeUp .35s both", animationDelay: `${40 + i * 30}ms` }}>
                   {page === n.id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-gradient-to-b from-indigo-300 to-teal-300" />}
+                  {reorderMode && <span className="text-slate-500 text-sm">⋮⋮</span>}
                   <span className={`text-base ${page === n.id ? "opacity-100" : "opacity-60"}`}>{n.icon}</span>{n.label}
                 </button>
               ))}
             </nav>
+            <button onClick={() => setReorderMode((v) => !v)} className="mt-3 px-2 py-1 rounded-full text-[8px] uppercase tracking-[0.28em] text-slate-500/70 hover:text-slate-300 hover:bg-white/5 transition-all self-center w-fit">
+              {reorderMode ? "confirm" : "change order"}
+            </button>
             <div className="mt-auto pt-5">
               <button onClick={() => { setMenuOpen(false); setPalette(true); }} className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400 active:bg-white/10 transition-all">
                 Cerca ovunque <span className="text-slate-600">⌕</span>
@@ -1319,7 +1362,7 @@ function App() {
 
       {/* barra rapida in basso: le 4 sezioni più usate + menu */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 glass-strong border-t border-white/10 flex justify-around" style={{ paddingTop: 6, paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}>
-        {NAV.filter((n) => ["dashboard", "movimenti", "viaggi", "report"].includes(n.id)).map((n) => (
+        {orderedNav.filter((n) => ["dashboard", "movimenti", "viaggi", "report"].includes(n.id)).map((n) => (
           <button key={n.id} onClick={() => setPage(n.id)} className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] rounded-lg transition-all ${page === n.id ? "text-indigo-300" : "text-slate-500"}`}>
             <span className="text-base">{n.icon}</span>{n.label}
           </button>
@@ -1350,7 +1393,7 @@ function App() {
           <BtnPrimary autoFocus onClick={() => { confirmDlg.onOk(); setConfirmDlg(null); }}>Conferma</BtnPrimary>
         </div>
       </Modal>
-      <CommandPalette open={palette} onClose={() => setPalette(false)} nav={NAV} setPage={setPage} txs={txs} catById={catById} onNew={() => setTxModal({})} />
+      <CommandPalette open={palette} onClose={() => setPalette(false)} nav={orderedNav} setPage={setPage} txs={txs} catById={catById} onNew={() => setTxModal({})} />
     </div>
   );
 }
