@@ -82,8 +82,8 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 /* ------------------ Dati di default ------------------ */
 const DEFAULT_CATEGORIES = [];
 
-const ACCOUNT_TYPES = [];
-const ACCOUNT_ICON_BY_TYPE = {};
+const ACCOUNT_TYPES = [ 'Conto corrente', 'Carta di credito', 'Conto virtuale', 'Contanti'];
+const ACCOUNT_ICON_BY_TYPE = { "Conto corrente": "🏦", "Carta di credito": "💳", "Conto virtuale": "📲", "Contanti": "💵"};
 const DEFAULT_ACCOUNTS = [];
 
 function seedTransactions() {
