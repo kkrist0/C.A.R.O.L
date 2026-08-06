@@ -84,6 +84,13 @@ const DEFAULT_CATEGORIES = [];
 
 const ACCOUNT_TYPES = [ 'Conto corrente', 'Carta di credito', 'Conto virtuale', 'Contanti', 'Altro'];
 const ACCOUNT_ICON_BY_TYPE = { "Conto corrente": "🏦", "Carta di credito": "💳", "Conto virtuale": "📲", "Contanti": "💵", "Altro": "💼" };
+const DEFAULT_ACCOUNT_TYPES = [
+  { tipo: 'Conto corrente', icona: '🏦' },
+  { tipo: 'Carta di credito', icona: '💳' },
+  { tipo: 'Conto virtuale', icona: '📲' },
+  { tipo: 'Contanti', icona: '💵' },
+  { tipo: 'Altro', icona: '💼' },
+];
 const DEFAULT_ACCOUNTS = [];
 
 function seedTransactions() {
@@ -112,6 +119,7 @@ function freshData(withDemo) {
     createdAt: new Date().toISOString(),
     transactions: withDemo ? seedTransactions() : [],
     accounts: DEFAULT_ACCOUNTS,
+    accountTypes: DEFAULT_ACCOUNT_TYPES,
     categories: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, ordine: i, sottocategorie: [] })),
     groups: ["Needs", "Wants", "Investimenti", "Entrate"],
     budgets: { affitto: 650, spesa: 220, ristoranti: 150, benzina: 120, shopping: 120, bollette: 110 },
@@ -228,6 +236,12 @@ const SHEET_SCHEMA = {
     headers: ["ID", "Nome", "Tipo", "Icona", "Colore", "SaldoIniziale"],
     pack: (st) => st.accounts.map((a) => [a.id, a.nome, a.tipo, a.icona, a.colore, a.saldoIniziale]),
     unpack: (rows) => rows.filter((r) => s(r[0])).map((r) => ({ id: s(r[0]), nome: s(r[1]), tipo: s(r[2]) || "Altro", icona: s(r[3]) || "💼", colore: s(r[4]) || "#8B9DF9", saldoIniziale: n(r[5]) })),
+  },
+  accountTypes: {
+    sheet: "TipiConto",
+    headers: ["Tipo", "Icona"],
+    pack: (st) => (st.accountTypes || []).map((a) => [a.tipo, a.icona || ""]),
+    unpack: (rows) => rows.filter((r) => s(r[0])).map((r) => ({ tipo: s(r[0]), icona: s(r[1]) || ACCOUNT_ICON_BY_TYPE[s(r[0])] || "💼" })),
   },
   categories: {
     sheet: "Categorie",
@@ -496,7 +510,7 @@ function uniscePreservando(locale, remoto) {
 }
 
 /** Estrae dallo stato completo solo le collezioni sincronizzabili. */
-const syncableState = (d) => ({ transactions: d.transactions, accounts: d.accounts, categories: d.categories, budgets: d.budgets, goals: d.goals, groups: d.groups, trips: d.trips || [], tripExpenses: d.tripExpenses || [], wishlist: d.wishlist || [], jobs: d.jobs || [], salaryEvents: d.salaryEvents || [], assets: d.assets || [], trades: d.trades || [], payslips: d.payslips || [], tfrEntries: d.tfrEntries || [], documenti: d.documenti || [], quotes: d.quotes || {} });
+const syncableState = (d) => ({ transactions: d.transactions, accounts: d.accounts, accountTypes: d.accountTypes, categories: d.categories, budgets: d.budgets, goals: d.goals, groups: d.groups, trips: d.trips || [], tripExpenses: d.tripExpenses || [], wishlist: d.wishlist || [], jobs: d.jobs || [], salaryEvents: d.salaryEvents || [], assets: d.assets || [], trades: d.trades || [], payslips: d.payslips || [], tfrEntries: d.tfrEntries || [], documenti: d.documenti || [], quotes: d.quotes || {} });
 
 const SYNC_CFG_KEY = "C.A.R.O.L.:sync";
 const DEFAULT_SYNC_CFG = { enabled: false, url: "", token: "", autoPush: true, lastSync: null };
@@ -783,6 +797,8 @@ function App() {
     if (!d.trips) d.trips = [];
     if (!d.tripExpenses) d.tripExpenses = [];
     if (!d.wishlist) d.wishlist = [];
+    if (!d.accountTypes || !Array.isArray(d.accountTypes) || d.accountTypes.length === 0) d.accountTypes = DEFAULT_ACCOUNT_TYPES;
+    else d.accountTypes = d.accountTypes.map((t) => ({ tipo: s(t.tipo), icona: s(t.icona) || ACCOUNT_ICON_BY_TYPE[s(t.tipo)] || "💼" }));
 
     if (!d.jobs) d.jobs = [];
     if (!d.payslips) d.payslips = [];
@@ -6561,17 +6577,22 @@ function Conti({ data, balances, update, onTransfer, notify, setConfirmDlg, txsA
         ))}
         {data.accounts.length === 0 && <EmptyState text='Nessun conto: creane uno con "+ Nuovo".' />}
       </div>
-      <AccountModal open={!!accModal} acc={accModal} onClose={() => setAccModal(null)} update={update} notify={notify} />
+      <AccountModal open={!!accModal} acc={accModal} onClose={() => setAccModal(null)} update={update} notify={notify} accountTypes={data.accountTypes} />
     </div>
   );
 }
 
-function AccountModal({ open, acc, onClose, update, notify }) {
+function AccountModal({ open, acc, onClose, update, notify, accountTypes }) {
   const isEdit = !!acc?.id;
   const ICONS = ["🏦", "💳", "💵", "🏛️", "📈", "🪙", "💼", "🐖", "🧧", "📱", "🌍", "🔒"];
+  const types = (accountTypes && accountTypes.length ? accountTypes : DEFAULT_ACCOUNT_TYPES);
+  const iconForType = (tipo) => {
+    const type = types.find((t) => t.tipo === tipo);
+    return type?.icona || ACCOUNT_ICON_BY_TYPE[tipo] || "💼";
+  };
   const [f, setF] = useState(null);
   useEffect(() => {
-    if (open) setF({ nome: acc?.nome || "", tipo: acc?.tipo || "Conto corrente", icona: acc?.icona || "🏦", colore: acc?.colore || "#8B9DF9", saldoIniziale: acc?.saldoIniziale ?? "" });
+    if (open) setF({ nome: acc?.nome || "", tipo: acc?.tipo || types[0].tipo, icona: acc?.icona || iconForType(acc?.tipo || types[0].tipo), colore: acc?.colore || "#8B9DF9", saldoIniziale: acc?.saldoIniziale ?? "" });
   }, [open, acc]);
   if (!open || !f) return null;
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
@@ -6594,7 +6615,7 @@ function AccountModal({ open, acc, onClose, update, notify }) {
       <div className="space-y-3">
         <div><Label>Nome</Label><Input value={f.nome} onChange={(e) => set("nome", e.target.value)} placeholder="es. Conto Intesa" autoFocus /></div>
         <div className="grid grid-cols-2 gap-3">
-          <div><Label>Tipo</Label><Select value={f.tipo} onChange={(e) => { set("tipo", e.target.value); if (!isEdit) set("icona", ACCOUNT_ICON_BY_TYPE[e.target.value] || "💼"); }}>{ACCOUNT_TYPES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+          <div><Label>Tipo</Label><Select value={f.tipo} onChange={(e) => { set("tipo", e.target.value); if (!isEdit) set("icona", iconForType(e.target.value)); }}>{types.map((t) => <option key={t.tipo}>{t.tipo}</option>)}</Select></div>
           <div><Label>Saldo iniziale €</Label><Input type="number" inputMode="decimal" step="0.01" value={f.saldoIniziale} onChange={(e) => set("saldoIniziale", e.target.value)} placeholder="0,00" /></div>
         </div>
         <div><Label>Icona</Label>
