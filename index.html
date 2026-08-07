@@ -137,6 +137,7 @@ function freshData(withDemo) {
     assets: [],
     trades: [],
     quotes: {},
+    portfolioSnapshots: [],
     trash: [],
     settings: { theme: "dark", onboarded: false },
     saveCount: 0,
@@ -355,6 +356,12 @@ SHEET_SCHEMA.quotes = {
   pack: (st) => Object.entries(st.quotes || {}).map(([k, q]) => [k, q.prezzo, q.varGiorno ?? "", q.ts || "", q.fonte || "manuale"]),
   unpack: (rows) => { const o = {}; rows.filter((r) => s(r[0])).forEach((r) => { o[s(r[0])] = { prezzo: n(r[1]), varGiorno: r[2] === "" ? null : n(r[2]), ts: s(r[3]), fonte: s(r[4]) || "manuale" }; }); return o; },
 };
+SHEET_SCHEMA.portfolioSnapshots = {
+  sheet: "StoricoInvestimenti",
+  headers: ["Mese", "Valore", "Note"],
+  pack: (st) => (st.portfolioSnapshots || []).map((s) => [s.mese, s.valore || 0, s.note || ""]),
+  unpack: (rows) => rows.filter((r) => s(r[0])).map((r) => ({ mese: s(r[0]), valore: n(r[1]), note: s(r[2]) })),
+};
 
 /* --- Buste paga: il percepito reale, mese per mese --- */
 SHEET_SCHEMA.payslips = {
@@ -514,7 +521,7 @@ function uniscePreservando(locale, remoto) {
 }
 
 /** Estrae dallo stato completo solo le collezioni sincronizzabili. */
-const syncableState = (d) => ({ transactions: d.transactions, accounts: d.accounts, accountTypes: d.accountTypes, categories: d.categories, budgets: d.budgets, goals: d.goals, groups: d.groups, trips: d.trips || [], tripExpenses: d.tripExpenses || [], wishlist: d.wishlist || [], jobs: d.jobs || [], salaryEvents: d.salaryEvents || [], assets: d.assets || [], trades: d.trades || [], payslips: d.payslips || [], tfrEntries: d.tfrEntries || [], documenti: d.documenti || [], quotes: d.quotes || {} });
+const syncableState = (d) => ({ transactions: d.transactions, accounts: d.accounts, accountTypes: d.accountTypes, categories: d.categories, budgets: d.budgets, goals: d.goals, groups: d.groups, trips: d.trips || [], tripExpenses: d.tripExpenses || [], wishlist: d.wishlist || [], jobs: d.jobs || [], salaryEvents: d.salaryEvents || [], assets: d.assets || [], trades: d.trades || [], portfolioSnapshots: d.portfolioSnapshots || [], payslips: d.payslips || [], tfrEntries: d.tfrEntries || [], documenti: d.documenti || [], quotes: d.quotes || {} });
 
 const SYNC_CFG_KEY = "C.A.R.O.L.:sync";
 const DEFAULT_SYNC_CFG = { enabled: false, url: "", token: "", autoPush: true, lastSync: null };
@@ -5335,7 +5342,6 @@ const ETF_CATALOG = [
   { t: "VFEM", isin: "IE00B3VVMM84", nome: "Vanguard FTSE Emerging Markets UCITS ETF", borsa: "Borsa Italiana", val: "EUR", em: "Vanguard", cat: "Azionario emergenti", area: "Emergenti", settore: "Diversificato", y: "VFEM.MI", s: "vfem.uk" },
   { t: "XEON", isin: "LU0290358497", nome: "Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C", borsa: "Borsa Italiana", val: "EUR", em: "Xtrackers", cat: "Monetario euro", area: "Europa", settore: "Monetario", y: "XEON.MI", s: "xeon.uk" },
   { t: "VHYL", isin: "IE00B8GKDB10", nome: "Vanguard FTSE All-World High Dividend Yield UCITS ETF", borsa: "Borsa Italiana", val: "EUR", em: "Vanguard", cat: "Azionario dividendi", area: "Globale", settore: "Diversificato", y: "VHYL.MI", s: "vhyl.uk" },
-  { t: "LCUW", isin: "LU1781541179", nome: "Amundi MSCI World UCITS ETF Acc", borsa: "Borsa Italiana", val: "EUR", em: "Amundi", cat: "Azionario paesi sviluppati", area: "Globale", settore: "Diversificato", y: "LCUW.MI", s: "lcuw.uk" },
   { t: "BTC", isin: "", nome: "Bitcoin", borsa: "Crypto", val: "EUR", em: "—", cat: "Criptovaluta", area: "Globale", settore: "Crypto", cg: "bitcoin", tipo: "Crypto" },
   { t: "ETH", isin: "", nome: "Ethereum", borsa: "Crypto", val: "EUR", em: "—", cat: "Criptovaluta", area: "Globale", settore: "Crypto", cg: "ethereum", tipo: "Crypto" },
 ];
@@ -5596,7 +5602,7 @@ const PALETTE = ["#8B9DF9", "#5EEAD4", "#FBBF24", "#F472B6", "#A78BFA", "#38BDF8
 const pct = (v, d = 2) => `${v >= 0 ? "+" : ""}${(v ?? 0).toFixed(d)}%`;
 
 /** posizioni, P/L e allocazione calcolati dalle operazioni */
-function usePortfolio(assets, trades, quotes) {
+function usePortfolio(assets, trades, quotes, snapshots) {
   return useMemo(() => {
     const posizioni = (assets || []).map((a) => {
       const ops = (trades || []).filter((t) => t.assetId === a.id).sort((x, y) => x.data.localeCompare(y.data));
@@ -5631,26 +5637,58 @@ function usePortfolio(assets, trades, quotes) {
       return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({ name, value: Math.round(value), fill: PALETTE[i % PALETTE.length] }));
     };
 
-    /* capitale investito nel tempo, mese per mese */
+    const priceHistoryByAsset = {};
+    (assets || []).forEach((a) => {
+      const storico = (quotes || {})[a.id]?.storico || [];
+      priceHistoryByAsset[a.id] = storico.slice().sort((x, y) => x.data.localeCompare(y.data)).reduce((map, entry) => {
+        const mk = monthKey(entry.data);
+        map[mk] = entry.prezzo;
+        return map;
+      }, {});
+    });
+    const snapshotByMonth = (snapshots || []).reduce((map, s) => { if (s?.mese) map[s.mese] = s; return map; }, {});
+
+    /* capitale investito e valore di mercato nel tempo, mese per mese */
     const tutte = [...(trades || [])].sort((a, b) => a.data.localeCompare(b.data));
     const timeline = [];
     if (tutte.length) {
       let mk = monthKey(tutte[0].data);
       const fine = monthKey(new Date());
       let cum = 0, i = 0;
+      const holdings = {};
       while (mk <= fine && timeline.length < 180) {
         while (i < tutte.length && monthKey(tutte[i].data) <= mk) {
           const t = tutte[i];
-          if (t.tipo === "acquisto") cum += t.quantita * t.prezzo + (t.commissioni || 0);
-          else if (t.tipo === "vendita") cum -= t.quantita * t.prezzo;
+          if (!holdings[t.assetId]) holdings[t.assetId] = { qta: 0, costo: 0 };
+          const assetState = holdings[t.assetId];
+          if (t.tipo === "acquisto") {
+            assetState.qta += t.quantita;
+            assetState.costo += t.quantita * t.prezzo + (t.commissioni || 0);
+            cum += t.quantita * t.prezzo + (t.commissioni || 0);
+          } else if (t.tipo === "vendita") {
+            const medio = assetState.qta ? assetState.costo / assetState.qta : 0;
+            assetState.qta -= t.quantita;
+            assetState.costo -= medio * t.quantita;
+            cum -= t.quantita * t.prezzo;
+          }
           i++;
         }
-        timeline.push({ mese: labelMkShort(mk), Investito: Math.round(cum) });
+        let valoreMk = 0;
+        Object.entries(holdings).forEach(([assetId, state]) => {
+          if (state.qta <= 0) return;
+          const prezzoMk = priceHistoryByAsset[assetId]?.[mk];
+          if (prezzoMk != null) valoreMk += state.qta * prezzoMk;
+        });
+        const snapshot = snapshotByMonth[mk];
+        if (snapshot?.valore != null) {
+          valoreMk = snapshot.valore;
+        } else if (valoreMk === 0 && aperte.length && monthKey(new Date()) === mk) {
+          valoreMk = valore;
+        }
+        timeline.push({ mese: mk, label: labelMkShort(mk), Investito: Math.round(cum), Valore: valoreMk != null ? Math.round(valoreMk) : null });
         mk = addMonthsMk(mk, 1);
       }
-      if (timeline.length) timeline[timeline.length - 1].Valore = Math.round(valore);
     }
-    /* rendimento annualizzato semplice, dal primo acquisto */
     const primo = tutte.find((t) => t.tipo === "acquisto");
     const anni = primo ? Math.max(0.08, (Date.now() - new Date(primo.data + "T12:00")) / 31557600000) : 0;
     const twr = investito ? (pl / investito) * 100 : 0;
@@ -5659,8 +5697,8 @@ function usePortfolio(assets, trades, quotes) {
     return { posizioni, aperte, investito, valore, pl, plPct: investito ? (pl / investito) * 100 : 0, dividendi, realizzato, varGiorno,
       perArea: raggruppa("area"), perSettore: raggruppa("settore"), perValuta: raggruppa("valuta"),
       perAsset: aperte.map((p, i) => ({ name: p.nome, value: Math.round(p.valore), fill: PALETTE[i % PALETTE.length], peso: valore ? (p.valore / valore) * 100 : 0 })).sort((a, b) => b.value - a.value),
-      timeline, twr, annuo, senzaPrezzi: aperte.some((p) => p.senzaPrezzo) };
-  }, [assets, trades, quotes]);
+      timeline, twr, annuo, senzaPrezzi: aperte.some((p) => p.senzaPrezzo), portfolioSnapshots: snapshots || [] };
+  }, [assets, trades, quotes, snapshots]);
 }
 
 function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
@@ -5670,11 +5708,23 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
   const [aggiornando, setAggiornando] = useState(false);
   const assets = data.assets || [];
   const trades = data.trades || [];
-  const pf = usePortfolio(assets, trades, data.quotes);
+  const pf = usePortfolio(assets, trades, data.quotes, data.portfolioSnapshots);
   const cfg = data.settings?.market || {};
   useEffect(() => { marketData.configura(cfg); }, [cfg.twelvedata, cfg.finnhub, cfg.alphavantage, cfg.proxy]); // eslint-disable-line
   const [esitoAgg, setEsitoAgg] = useState(null);
   const [vista, setVista] = useState("portafoglio");
+  const [snapshotModalOpen, setSnapshotModalOpen] = useState(false);
+  const [snapshotMonth, setSnapshotMonth] = useState(monthKey(new Date()));
+  const [snapshotValue, setSnapshotValue] = useState("");
+  const [snapshotNote, setSnapshotNote] = useState("");
+  const mercatoCaricaRef = useRef(null);
+  const needAutoCarica = useRef(true);
+
+  useEffect(() => {
+    // quando si apre la pagina investimenti, avvia anche l'aggiornamento delle quotazioni
+    // per il portafoglio (aggiornaTutti) e pianifica di lanciare il carica() del Mercato quando disponibile
+    aggiornaTutti();
+  }, []);
 
   const saveAsset = (a) => {
     update((d) => { if (!d.assets) d.assets = []; const i = d.assets.findIndex((x) => x.id === a.id); if (i >= 0) d.assets[i] = a; else d.assets.push(a); return d; });
@@ -5690,6 +5740,65 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
       cat.gruppo = [cat.gruppo, "Investimenti"].filter(Boolean).join("|");
     }
     return cat.id;
+  };
+  const savePortfolioSnapshot = (mk, valore) => {
+    if (!mk || valore == null) return;
+    update((d) => {
+      if (!d.portfolioSnapshots) d.portfolioSnapshots = [];
+      const existing = d.portfolioSnapshots.find((s) => s.mese === mk);
+      if (existing) {
+        existing.valore = valore;
+        existing.note = `Aggiornato da grafico ${labelMk(mk)}`;
+      } else {
+        d.portfolioSnapshots.push({ mese: mk, valore, note: `Snapshot da grafico ${labelMk(mk)}` });
+      }
+      d.portfolioSnapshots.sort((a, b) => a.mese.localeCompare(b.mese));
+      return d;
+    });
+    notify(`Snapshot salvato per ${labelMk(mk)}: ${eur0(valore)}`);
+  };
+  const handleTimelineClick = (state) => {
+    const payload = state?.activePayload || (Array.isArray(state) ? state[0]?.payload : null);
+    const active = Array.isArray(payload) ? payload[0] : payload;
+    const mk = active?.payload?.mese;
+    const valore = active?.payload?.Valore;
+    if (!mk) return;
+    const snapshot = (data.portfolioSnapshots || []).find((s) => s.mese === mk);
+    setSnapshotMonth(mk);
+    if (snapshot) {
+      setSnapshotValue(String(snapshot.valore).replace(".", ","));
+      setSnapshotNote(snapshot.note || "");
+    } else if (valore != null) {
+      setSnapshotValue(String(valore).replace(".", ","));
+      setSnapshotNote("");
+    } else {
+      setSnapshotValue("");
+      setSnapshotNote("");
+    }
+    setSnapshotModalOpen(true);
+  };
+  const saveManualSnapshot = () => {
+    const valore = Number(String(snapshotValue || "").replace(/,/g, "."));
+    if (!snapshotMonth || !Number.isFinite(valore) || valore <= 0) {
+      notify("Inserisci un valore valido prima di salvare.");
+      return;
+    }
+    update((d) => {
+      if (!d.portfolioSnapshots) d.portfolioSnapshots = [];
+      const existing = d.portfolioSnapshots.find((s) => s.mese === snapshotMonth);
+      if (existing) {
+        existing.valore = valore;
+        existing.note = snapshotNote || `Valutazione manuale ${labelMk(snapshotMonth)}`;
+      } else {
+        d.portfolioSnapshots.push({ mese: snapshotMonth, valore, note: snapshotNote || `Valutazione manuale ${labelMk(snapshotMonth)}` });
+      }
+      d.portfolioSnapshots.sort((a, b) => a.mese.localeCompare(b.mese));
+      return d;
+    });
+    notify(`Valutazione fine mese salvata per ${labelMk(snapshotMonth)}: ${eur0(valore)}`);
+    setSnapshotValue("");
+    setSnapshotNote("");
+    setSnapshotModalOpen(false);
   };
   const saveTrade = (t) => {
     update((d) => {
@@ -5794,7 +5903,7 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
       </header>
 
       {vista === "mercato" && (
-        <MercatoPanel assets={assets} notify={notify} onAggiungi={(e, q) => {
+        <MercatoPanel assets={assets} notify={notify} onCaricaReady={(fn) => { mercatoCaricaRef.current = fn; if (needAutoCarica.current && fn) { try { fn(); } catch (e) {} needAutoCarica.current = false; } }} onAggiungi={(e, q) => {
           const esistente = assets.find((a) => (a.isin && a.isin === e.isin) || a.ticker === e.t);
           if (esistente) { setTradeModal({ assetId: esistente.id, prezzo: q?.prezzo || "" }); return; }
           setAssetModal({ nome: e.nome, ticker: e.t, isin: e.isin, tipo: e.tipo || "ETF", mercato: e.borsa, valuta: e.val,
@@ -5878,14 +5987,14 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
               <h2 className="font-display text-white mb-3">Capitale investito nel tempo</h2>
               <div className="h-52 sm:h-60">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={pf.timeline}>
+                  <ComposedChart data={pf.timeline} onClick={handleTimelineClick}>
                     <defs>
                       <linearGradient id="ginv" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#8B9DF9" stopOpacity={0.4} /><stop offset="100%" stopColor="#8B9DF9" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
-                    <XAxis dataKey="mese" tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
+                    <XAxis dataKey="label" tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
                     <YAxis tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} width={48} />
                     <Tooltip content={<ChartTip />} />
                     <Area type="monotone" dataKey="Investito" stroke="#A5B4FC" strokeWidth={2.5} fill="url(#ginv)" animationDuration={1000} />
@@ -5893,7 +6002,20 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
-              <p className="text-[11px] text-slate-600 mt-2">La linea teal è il valore di mercato di oggi: senza uno storico dei prezzi non è ricostruibile a ritroso.</p>
+              <p className="text-[11px] text-slate-600 mt-2">Clicca un punto del grafico per salvare il valore di mercato a fine mese.</p>
+              {pf.portfolioSnapshots.length > 0 && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300">
+                  {pf.portfolioSnapshots.slice(-4).reverse().map((s) => (
+                    <div key={s.mese} className="rounded-xl bg-white/5 border border-white/10 p-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>{labelMk(s.mese)}</span>
+                        <span className="font-semibold tabular-nums">{eur0(s.valore)}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 truncate">{s.note || "Salvato dal grafico"}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             <Card className="lg:col-span-2 p-5" hover={false} delay={200}>
@@ -5987,6 +6109,33 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
       {/* i modali restano fuori dalle schede: servono in entrambe le viste */}
       <AssetModal open={!!assetModal} asset={assetModal} onClose={() => setAssetModal(null)} onSave={saveAsset} />
       <TradeModal open={!!tradeModal} trade={tradeModal} assets={assets} data={data} onClose={() => setTradeModal(null)} onSave={saveTrade} />
+      <Modal open={snapshotModalOpen} onClose={() => setSnapshotModalOpen(false)} title={snapshotModalOpen ? `Valutazione fine mese · ${labelMk(snapshotMonth)}` : "Valutazione fine mese"}>
+        <div className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <Label>Periodo</Label>
+              <Select value={snapshotMonth} onChange={(e) => setSnapshotMonth(e.target.value)}>
+                {(pf.timeline.length ? pf.timeline : [{ mese: monthKey(new Date()), label: labelMkShort(monthKey(new Date())) }]).map((row) => (
+                  <option key={row.mese} value={row.mese}>{labelMk(row.mese)}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label>Valore di fine mese</Label>
+              <Input type="text" value={snapshotValue} onChange={(e) => setSnapshotValue(e.target.value)} placeholder="12345,67" autoFocus />
+            </div>
+          </div>
+          <div>
+            <Label>Nota</Label>
+            <Input value={snapshotNote} onChange={(e) => setSnapshotNote(e.target.value)} placeholder="Es. valore report broker" />
+          </div>
+          <p className="text-[11px] text-slate-500">Inserisci un valore manuale o modifica quello esistente per questo mese. Il grafico usa la valutazione manuale quando presente.</p>
+        </div>
+        <div className="modal-actions flex justify-end gap-3 mt-5">
+          <BtnGhost onClick={() => setSnapshotModalOpen(false)}>Annulla</BtnGhost>
+          <BtnPrimary onClick={saveManualSnapshot}>Salva valutazione</BtnPrimary>
+        </div>
+      </Modal>
       {dettaglio && (
         <AssetDetail pos={pf.posizioni.find((p) => p.id === dettaglio)} onClose={() => setDettaglio(null)}
           onEdit={(a) => { setAssetModal(a); setDettaglio(null); }}
@@ -6156,7 +6305,7 @@ function Sparkline({ punti, colore = "#8B9DF9", w = 90, h = 28 }) {
   );
 }
 
-function MercatoPanel({ assets, onAggiungi, notify }) {
+function MercatoPanel({ assets, onAggiungi, notify, onCaricaReady }) {
   const [dati, setDati] = useState({});      // ticker → { prezzo, variazione, fonte, storico }
   const [caricando, setCaricando] = useState(false);
   const [errore, setErrore] = useState(null);
@@ -6194,6 +6343,7 @@ function MercatoPanel({ assets, onAggiungi, notify }) {
       notify?.(`${ok} quotazioni caricate${falliti ? ` · ${falliti} senza prezzo` : ""}`);
     }
   };
+  useEffect(() => { if (onCaricaReady) onCaricaReady(carica); }, [onCaricaReady, carica]);
 
   return (
     <div style={{ animation: "fadeUp .4s both" }}>
