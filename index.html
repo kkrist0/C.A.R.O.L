@@ -139,7 +139,7 @@ function freshData(withDemo) {
     quotes: {},
     portfolioSnapshots: [],
     trash: [],
-    settings: { theme: "dark", onboarded: false },
+    settings: { theme: "dark", onboarded: false, patrimonioToggles: { liquidi: true, investimenti: false, tfr: false } },
     saveCount: 0,
   };
 }
@@ -1296,7 +1296,7 @@ function App() {
               </div>
             </div>
           )}
-          {page === "dashboard" && <Dashboard {...{ patrimonio: patrimonioShown, isCurrentMonth, selMonth, setSelMonth, deltaMese, cur, prev, series, chartRange, setChartRange, txs, catById, accById, insights, investito, data, setTxModal, softDelete, setPage }} />}
+          {page === "dashboard" && <Dashboard {...{ patrimonio: patrimonioShown, isCurrentMonth, selMonth, setSelMonth, deltaMese, cur, prev, series, chartRange, setChartRange, txs, catById, accById, insights, investito, data, update, setTxModal, softDelete, setPage }} />}
           {page === "movimenti" && <Movimenti {...{ txs, catById, accById, data, setTxModal, softDelete }} />}
           {page === "budget" && <BudgetPage {...{ data, update, cur, catById, notify }} />}
           {page === "categorie" && <CategoriePage {...{ data, update, notify, setConfirmDlg, txs, setCatEditor }} />}
@@ -1493,10 +1493,106 @@ function MonthYearSelect({ value, onChange }) {
 }
 
 
-function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMese, cur, prev, series, chartRange, setChartRange, txs, catById, accById, insights, investito, data, setTxModal, softDelete, setPage }) {
+function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMese, cur, prev, series, chartRange, setChartRange, txs, catById, accById, insights, investito, data, update, setTxModal, softDelete, setPage }) {
   const budgetTot = Object.values(data.budgets || {}).reduce((s, v) => s + v, 0);
   const budgetSpeso = Object.keys(data.budgets || {}).reduce((s, k) => s + cur.mt.filter((t) => t.tipo === "spesa" && t.categoria === k).reduce((x, t) => x + t.importo, 0), 0);
   const monthTxs = useMemo(() => txs.filter((t) => monthKey(t.data) === selMonth).slice(0, 6), [txs, selMonth]);
+
+  /* La Dashboard può mostrare una qualsiasi combinazione dei tre blocchi
+     patrimoniali. I valori vengono letti dalle sezioni Investimenti e Stipendio/TFR. */
+  const savedToggles = data.settings?.patrimonioToggles || {};
+  const [patrimonioToggles, setPatrimonioToggles] = useState({
+    liquidi: savedToggles.liquidi ?? true,
+    investimenti: savedToggles.investimenti ?? false,
+    tfr: savedToggles.tfr ?? false,
+  });
+
+  useEffect(() => {
+    const next = {
+      liquidi: savedToggles.liquidi ?? true,
+      investimenti: savedToggles.investimenti ?? false,
+      tfr: savedToggles.tfr ?? false,
+    };
+    if (
+      next.liquidi !== patrimonioToggles.liquidi ||
+      next.investimenti !== patrimonioToggles.investimenti ||
+      next.tfr !== patrimonioToggles.tfr
+    ) setPatrimonioToggles(next);
+  }, [data.settings?.patrimonioToggles?.liquidi, data.settings?.patrimonioToggles?.investimenti, data.settings?.patrimonioToggles?.tfr]); // eslint-disable-line
+
+  const pf = usePortfolio(data.assets || [], data.trades || [], data.quotes || {}, data.portfolioSnapshots || []);
+  const carrieraStats = useCarrieraStats(data, new Date().getFullYear());
+
+  const valueAtOrBefore = useCallback((rows, key, valueKey, mk) => {
+    const sorted = (rows || []).filter((r) => r && r[key] && r[key] <= mk).sort((a, b) => a[key].localeCompare(b[key]));
+    return sorted.length ? Number(sorted[sorted.length - 1][valueKey]) || 0 : 0;
+  }, []);
+
+  const investimentiAt = useCallback((mk) => {
+    if (mk === monthKey(new Date())) return pf.valore || 0;
+    return valueAtOrBefore(pf.timeline, "mese", "Valore", mk);
+  }, [pf, valueAtOrBefore]);
+
+  const tfrAt = useCallback((mk) => {
+    if (mk === monthKey(new Date())) return carrieraStats.tfrTotale || 0;
+    return valueAtOrBefore(carrieraStats.tfrSerie, "mk", "totale", mk);
+  }, [carrieraStats, valueAtOrBefore]);
+
+  const componentValues = useMemo(() => ({
+    liquidi: patrimonio,
+    investimenti: investimentiAt(selMonth),
+    tfr: tfrAt(selMonth),
+  }), [patrimonio, selMonth, investimentiAt, tfrAt]);
+
+  const patrimonioVisualizzato = useMemo(() => (
+    (patrimonioToggles.liquidi ? componentValues.liquidi : 0) +
+    (patrimonioToggles.investimenti ? componentValues.investimenti : 0) +
+    (patrimonioToggles.tfr ? componentValues.tfr : 0)
+  ), [patrimonioToggles, componentValues]);
+
+  const togglePatrimonio = (key) => {
+    const next = { ...patrimonioToggles, [key]: !patrimonioToggles[key] };
+    setPatrimonioToggles(next);
+    update((d) => {
+      d.settings = d.settings || {};
+      d.settings.patrimonioToggles = next;
+      return d;
+    });
+  };
+
+  const seriePatrimonio = useMemo(() => series.map((point) => {
+    const mk = monthKey(point.iso);
+    const liquidi = point.valore || 0;
+    const investimenti = investimentiAt(mk);
+    const tfr = tfrAt(mk);
+    return {
+      ...point,
+      valore: Math.round(
+        (patrimonioToggles.liquidi ? liquidi : 0) +
+        (patrimonioToggles.investimenti ? investimenti : 0) +
+        (patrimonioToggles.tfr ? tfr : 0)
+      ),
+    };
+  }), [series, patrimonioToggles, investimentiAt, tfrAt]);
+
+  const deltaPatrimonio = useMemo(() => {
+    const current = patrimonioVisualizzato;
+    const previousMk = addMonthsMk(selMonth, -1);
+    const previousLiquidi = prev ? patrimonio - cur.risparmio - cur.inv : 0;
+    const previousInvestimenti = investimentiAt(previousMk);
+    const previousTfr = tfrAt(previousMk);
+    const fallbackLiquidi = previousLiquidi || 0;
+    const previous = (patrimonioToggles.liquidi ? fallbackLiquidi : 0) +
+      (patrimonioToggles.investimenti ? previousInvestimenti : 0) +
+      (patrimonioToggles.tfr ? previousTfr : 0);
+    return current - previous;
+  }, [patrimonioVisualizzato, selMonth, patrimonioToggles, investimentiAt, tfrAt, patrimonio, prev, cur]);
+
+  const toggleItems = [
+    { key: "liquidi", label: "Soldi liquidi", short: "Liquidi", icon: "●" },
+    { key: "investimenti", label: "Investimenti", short: "Investimenti", icon: "↗" },
+    { key: "tfr", label: "TFR", short: "TFR", icon: "◴" },
+  ];
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -1513,23 +1609,50 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
         <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-indigo-400 to-teal-300" />
         <div className="flex flex-col md:flex-row md:items-end gap-6 justify-between relative">
           <div key={selMonth} style={{ animation: "fadeUp .4s both" }}>
-            <p className="text-sm text-slate-400 mb-1">{isCurrentMonth ? "Patrimonio totale" : `Patrimonio a fine ${labelMk(selMonth).toLowerCase()}`}</p>
-            <CountEur value={patrimonio} cls="font-display text-3xl sm:text-4xl md:text-5xl text-white tracking-tight tabular-nums" />
+            <p className="text-sm text-slate-400 mb-1">{isCurrentMonth ? "Patrimonio mostrato" : `Patrimonio a fine ${labelMk(selMonth).toLowerCase()}`}</p>
+            <CountEur value={patrimonioVisualizzato} cls="font-display text-3xl sm:text-4xl md:text-5xl text-white tracking-tight tabular-nums" />
             <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <Chip tone={deltaMese >= 0 ? "up" : "down"}>{deltaMese >= 0 ? "▲" : "▼"} {eur0(Math.abs(deltaMese))} nel mese</Chip>
+              <Chip tone={deltaPatrimonio >= 0 ? "up" : "down"}>{deltaPatrimonio >= 0 ? "▲" : "▼"} {eur0(Math.abs(deltaPatrimonio))} nel mese</Chip>
               {!isCurrentMonth && <Chip>Vista storica</Chip>}
-              {isCurrentMonth && <Chip>{investito > 0 ? `${eur0(investito)} investiti in totale` : "Nessun investimento"}</Chip>}
+              {patrimonioToggles.investimenti && componentValues.investimenti > 0 && <Chip>{eur0(componentValues.investimenti)} investimenti</Chip>}
+              {patrimonioToggles.tfr && componentValues.tfr > 0 && <Chip>{eur0(componentValues.tfr)} TFR</Chip>}
             </div>
           </div>
-          <div className="flex gap-1 bg-white/5 rounded-xl p-1 self-start md:self-end">
-            {[{ l: "7g", v: 7 }, { l: "1M", v: 30 }, { l: "3M", v: 90 }, { l: "1A", v: 365 }].map((r) => (
-              <button key={r.v} onClick={() => setChartRange(r.v)} className={`px-3 py-1 rounded-lg text-xs transition-all ${chartRange === r.v ? "bg-white/15 text-white" : "text-slate-400 hover:text-white"}`}>{r.l}</button>
-            ))}
+          <div className="flex flex-col items-stretch gap-2 self-start md:self-end w-full md:w-auto">
+            <div className="flex gap-1 bg-white/5 rounded-xl p-1 self-end">
+              {[{ l: "7g", v: 7 }, { l: "1M", v: 30 }, { l: "3M", v: 90 }, { l: "1A", v: 365 }].map((r) => (
+                <button key={r.v} onClick={() => setChartRange(r.v)} className={`px-3 py-1 rounded-lg text-xs transition-all ${chartRange === r.v ? "bg-white/15 text-white" : "text-slate-400 hover:text-white"}`}>{r.l}</button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              {toggleItems.map((item) => {
+                const active = patrimonioToggles[item.key];
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => togglePatrimonio(item.key)}
+                    aria-pressed={active}
+                    title={`Conteggia ${item.label.toLowerCase()} nel patrimonio`}
+                    className={`group flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs transition-all ${
+                      active
+                        ? "bg-white/[0.09] border-white/15 text-white shadow-lg shadow-black/10"
+                        : "bg-white/[0.025] border-white/[0.07] text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <span className={`relative w-8 h-[18px] rounded-full shrink-0 transition-all ${active ? "bg-gradient-to-r from-indigo-400 to-violet-400" : "bg-white/10"}`}>
+                      <span className={`absolute top-0.5 w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all ${active ? "left-[17px]" : "left-0.5"}`} />
+                    </span>
+                    <span>{item.short}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
         <div className="h-48 md:h-56 mt-6 -mx-2">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={series} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+            <AreaChart data={seriePatrimonio} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
               <defs>
                 <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#8B9DF9" stopOpacity={0.45} />
