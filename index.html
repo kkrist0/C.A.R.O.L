@@ -1187,7 +1187,16 @@ function App() {
     update((d) => { d.settings.navOrder = next; return d; });
     setDraggedNavId(null);
   };
+  
+  const mainRef = useRef(null);
 
+  useEffect(() => {
+    mainRef.current?.scrollTo({
+      top: 0,
+      behavior: "auto",
+    });
+  }, [page]);
+  
   /* ---------- Skeleton loading ---------- */
   if (!data) {
     return (
@@ -1271,7 +1280,7 @@ function App() {
         </aside>
 
         {/* Main */}
-        <main className="main-pad flex-1 min-w-0 h-screen overflow-y-auto p-4 md:p-8">
+        <main ref={mainRef} className="main-pad flex-1 min-w-0 h-screen overflow-y-auto p-4 md:p-8">
           {/* topbar mobile */}
           <div className="md:hidden flex items-center justify-between gap-2 mb-5">
             <button onClick={() => setMenuOpen(true)} aria-label="Apri il menu" className="w-10 h-10 shrink-0 rounded-xl bg-white/5 border border-white/10 grid place-items-center gap-[3px] active:scale-95 transition-transform">
