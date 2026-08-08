@@ -1219,9 +1219,9 @@ function App() {
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(139,157,249,0.06), transparent)" }} />
       </div>
 
-      <div className="relative flex min-h-screen">
+      <div className="relative flex h-screen overflow-hidden">
         {/* Sidebar */}
-        <aside className="hidden md:flex flex-col w-56 shrink-0 p-5 gap-1 border-r border-white/5">
+        <aside className="hidden md:flex flex-col w-56 shrink-0 p-5 gap-1 border-r border-white/5 h-screen overflow-hidden">
           <div className="flex items-center gap-2.5 mb-4 px-1" style={{ animation: "fadeUp .5s both" }}>
             <Logo size={34} />
             <div>
@@ -1271,7 +1271,7 @@ function App() {
         </aside>
 
         {/* Main */}
-        <main className="main-pad flex-1 min-w-0 p-4 md:p-8">
+        <main className="main-pad flex-1 min-w-0 h-screen overflow-y-auto p-4 md:p-8">
           {/* topbar mobile */}
           <div className="md:hidden flex items-center justify-between gap-2 mb-5">
             <button onClick={() => setMenuOpen(true)} aria-label="Apri il menu" className="w-10 h-10 shrink-0 rounded-xl bg-white/5 border border-white/10 grid place-items-center gap-[3px] active:scale-95 transition-transform">
