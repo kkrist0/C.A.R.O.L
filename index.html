@@ -1769,6 +1769,25 @@ function Movimenti({ txs, catById, accById, data, setTxModal, softDelete }) {
   const [pTo, setPTo] = useState(nowMk);
   const [view, setView] = useState("gruppi"); // gruppi | lista
   const [limit, setLimit] = useState(60);
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  const [expandedGroups, setExpandedGroups] = useState(new Set([nowMk]));
+
+  // Effetto che controlla il campo di ricerca
+  useEffect(() => {
+    // Se il campo è vuoto, apri SOLO il mese corrente. Altrimenti lascia gestire alla ricerca.
+    if (dq === "") {
+      setExpandedGroups(new Set([nowMk]));
+    }
+  }, [dq, nowMk]);
+
+  const toggleGroup = (mk) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(mk)) next.delete(mk);
+      else next.add(mk);
+      return next;
+    });
+  };
   useEffect(() => { setLimit(60); }, [dq, fCat, fConto, fTipo, pmode, pMk, pYear, pFrom, pTo]);
 
   /* mesi del periodo (null = nessun filtro temporale) */
@@ -1947,22 +1966,37 @@ function Movimenti({ txs, catById, accById, data, setTxModal, softDelete }) {
           ))}
         </div>
       </div>
-
       {view === "gruppi" ? (
         <div className="space-y-4">
-          {groups.map((g, gi) => (
-            <Card key={g.mk} className="p-4" hover={false} delay={Math.min(gi, 6) * 60}>
-              <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-                <h3 className="font-display text-white">{labelMk(g.mk)}</h3>
-                <div className="flex gap-2 text-xs">
-                  {g.spese > 0 && <Chip tone="down">Spese {eur0(g.spese)}</Chip>}
-                  {g.entrate > 0 && <Chip tone="up">Entrate {eur0(g.entrate)}</Chip>}
+          {groups.map((g, gi) => {
+            // È espanso se c'è del testo nella ricerca, OPPURE se l'utente/il default lo ha espanso
+            const isExpanded = dq !== "" ? true : expandedGroups.has(g.mk);
+            
+            return (
+              <Card key={g.mk} className="p-4" hover={false} delay={Math.min(gi, 6) * 60}>
+                <div 
+                  className={`flex items-center justify-between mb-1 flex-wrap gap-2 select-none ${dq === "" ? "cursor-pointer" : ""}`}
+                  // Permettiamo di cliccare per chiudere/aprire solo se NON stiamo cercando
+                  onClick={() => { if (dq === "") toggleGroup(g.mk); }}
+                >
+                  <h3 className="font-display text-white flex items-center gap-2">
+                    <span className="text-slate-500 text-xs transition-transform duration-200" style={{ transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)" }}>▼</span>
+                    {labelMk(g.mk)}
+                  </h3>
+                  <div className="flex gap-2 text-xs">
+                    {g.spese > 0 && <Chip tone="down">Spese {eur0(g.spese)}</Chip>}
+                    {g.entrate > 0 && <Chip tone="up">Entrate {eur0(g.entrate)}</Chip>}
+                  </div>
                 </div>
-              </div>
-              <TxList txs={g.list} catById={catById} accById={accById} onEdit={setTxModal} onDelete={softDelete} />
-              <p className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-white/[0.05] text-right">Totale {MESI[parseMk(g.mk).m]}: <b className="text-slate-300">{eur0(g.spese)}</b> di spese{g.entrate > 0 ? ` · ${eur0(g.entrate)} di entrate` : ""}</p>
-            </Card>
-          ))}
+                {isExpanded && (
+                  <div style={{ animation: "fadeIn .2s ease-out" }}>
+                    <TxList txs={g.list} catById={catById} accById={accById} onEdit={setTxModal} onDelete={softDelete} />
+                    <p className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-white/[0.05] text-right">Totale {MESI[parseMk(g.mk).m]}: <b className="text-slate-300">{eur0(g.spese)}</b> di spese{g.entrate > 0 ? ` · ${eur0(g.entrate)} di entrate` : ""}</p>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
           {groups.length === 0 && <Card className="p-4" hover={false}><EmptyState text="Nessun movimento con questi filtri." /></Card>}
         </div>
       ) : (
