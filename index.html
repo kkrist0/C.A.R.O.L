@@ -1794,7 +1794,10 @@ function Movimenti({ txs, catById, accById, data, setTxModal, softDelete }) {
     if (fTipo && t.tipo !== fTipo) return false;
     if (dq) {
       const s = `${t.note || ""} ${catById[t.categoria]?.nome || ""} ${t.sottocategoria || ""} ${accById[t.conto]?.nome || ""} ${(t.tags || []).join(" ")}`.toLowerCase();
-      if (!s.includes(dq.toLowerCase())) return false;
+      const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const query = escapeRegExp(dq.toLowerCase());
+      const regex = new RegExp(`\\b${query}`, 'i');
+      if (!regex.test(s)) return false;
     }
     return true;
   }), [txs, dq, fCat, fConto, fTipo, periodSet, catById, accById]);
