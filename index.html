@@ -7947,7 +7947,8 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
       </div>
       {isTr && <p className="text-[11px] text-slate-500 mb-3 -mt-1">Sposta denaro tra i tuoi conti: non conta come spesa né come entrata, e il patrimonio totale resta invariato.</p>}
       <div className="space-y-3">
-        <div><Label>Importo</Label><Input type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.importo} onChange={(e) => set("importo", e.target.value)} autoFocus /></div>
+        <div><Label>Descrizione</Label><Input placeholder="Descrizione spesa…" value={form.note} onChange={(e) => set("note", e.target.value)} autoFocus /></div>
+        <div><Label>Importo</Label><Input type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.importo} onChange={(e) => set("importo", e.target.value)}/></div>
         {isTr ? (
           <>
             <div className="grid grid-cols-2 gap-3">
@@ -7996,7 +7997,6 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
               <div><Label>Metodo</Label><Select value={form.metodo} onChange={(e) => set("metodo", e.target.value)}>{["Carta", "Contanti", "Bonifico", "Addebito", "Altro"].map((m) => <option key={m}>{m}</option>)}</Select></div>
               <div><Label>Tag</Label><Input placeholder="es. vacanza, lavoro" value={form.tags} onChange={(e) => set("tags", e.target.value)} /></div>
             </div>
-            <div><Label>Note</Label><Input placeholder="Descrizione…" value={form.note} onChange={(e) => set("note", e.target.value)} /></div>
           </>
         )}
       </div>
