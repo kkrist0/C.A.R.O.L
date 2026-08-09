@@ -4440,6 +4440,65 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
     const dati = b.cedolino?.tipo === "file" ? await cedoliniStore.leggi(b.id) : null;
     setCedolinoAperto({ valore: { ...b.cedolino, nome: b.cedolino?.nome || `Cedolino ${labelMk(b.mese)}` }, dati });
   };
+  // Calcolo proporzionale per dividere il netto e le trattenute (MESE)
+  const chartDataMesi = useMemo(() => {
+    return st.mesiAnno.map((m) => {
+      const b = m.busta;
+      if (!b) return { ...m, nettoBase: 0, nettoExtra: 0, trattBase: 0, trattExtra: 0 };
+      
+      const lordoBase = b.lordo || 0;
+      const lordoExtraTassabile = (b.bonus || 0) + (b.straordinari || 0) + (b.premio || 0) + (b.tredicesima || 0) + (b.quattordicesima || 0) + (b.altre || 0);
+      const rimborsi = b.rimborsi || 0; 
+      
+      const lordoTotaleTassabile = lordoBase + lordoExtraTassabile;
+      const trattenute = b.trattenute || 0;
+      
+      let trattBase = 0, trattExtra = 0;
+      if (lordoTotaleTassabile > 0) {
+        trattBase = (lordoBase / lordoTotaleTassabile) * trattenute;
+        trattExtra = (lordoExtraTassabile / lordoTotaleTassabile) * trattenute;
+      }
+      
+      return {
+        ...m,
+        nettoBase: Math.round(lordoBase - trattBase),
+        nettoExtra: Math.round(lordoExtraTassabile - trattExtra + rimborsi),
+        trattBase: Math.round(trattBase),
+        trattExtra: Math.round(trattExtra),
+      };
+    });
+  }, [st.mesiAnno]);
+
+  // Calcolo proporzionale per dividere il netto e le trattenute (ANNO)
+  const chartDataAnni = useMemo(() => {
+    const map = {};
+    (st.payslips || []).forEach((b) => {
+      const y = b.mese.slice(0, 4);
+      if (!map[y]) map[y] = { anno: y, lordoBase: 0, lordoExtra: 0, rimborsi: 0, trattenute: 0 };
+      
+      map[y].lordoBase += b.lordo || 0;
+      map[y].lordoExtra += (b.bonus || 0) + (b.straordinari || 0) + (b.premio || 0) + (b.tredicesima || 0) + (b.quattordicesima || 0) + (b.altre || 0);
+      map[y].rimborsi += b.rimborsi || 0;
+      map[y].trattenute += b.trattenute || 0;
+    });
+
+    return Object.values(map).sort((a, b) => a.anno.localeCompare(b.anno)).map((y) => {
+      const lordoTotaleTassabile = y.lordoBase + y.lordoExtra;
+      let trattBase = 0, trattExtra = 0;
+      if (lordoTotaleTassabile > 0) {
+        trattBase = (y.lordoBase / lordoTotaleTassabile) * y.trattenute;
+        trattExtra = (y.lordoExtra / lordoTotaleTassabile) * y.trattenute;
+      }
+      
+      return {
+        anno: y.anno,
+        nettoBase: Math.round(y.lordoBase - trattBase),
+        nettoExtra: Math.round(y.lordoExtra - trattExtra + y.rimborsi),
+        trattExtra: Math.round(trattExtra),
+        trattBase: Math.round(trattBase),
+      };
+    });
+  }, [st.payslips]);
   return (
     <div style={{ animation: "fadeUp .4s both" }}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
@@ -4473,26 +4532,41 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
         <div className="h-56 sm:h-64">
           <ResponsiveContainer width="100%" height="100%">
             {vista === "mensile" ? (
-              <ComposedChart data={st.mesiAnno}>
+              <ComposedChart data={chartDataMesi}>
                 <defs>
-                  <linearGradient id="gLordo" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#93C5FD" stopOpacity={0.35} /><stop offset="100%" stopColor="#93C5FD" stopOpacity={0} /></linearGradient>
+                  {/* Azzurro: Netto Base */}
+                  <linearGradient id="gNettoBase" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#38BDF8" stopOpacity={0.4} /><stop offset="100%" stopColor="#38BDF8" stopOpacity={0} /></linearGradient>
+                  {/* Verde: Netto Extra */}
+                  <linearGradient id="gNettoExtra" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5EEAD4" stopOpacity={0.4} /><stop offset="100%" stopColor="#5EEAD4" stopOpacity={0} /></linearGradient>
+                  {/* Rosso chiaro: Trattenute Extra */}
+                  <linearGradient id="gTrattExtra" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#FDA4AF" stopOpacity={0.4} /><stop offset="100%" stopColor="#FDA4AF" stopOpacity={0} /></linearGradient>
+                  {/* Rosso forte: Trattenute Base */}
+                  <linearGradient id="gTrattBase" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#FB7185" stopOpacity={0.4} /><stop offset="100%" stopColor="#FB7185" stopOpacity={0} /></linearGradient>
                 </defs>
+                
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
                 <XAxis dataKey="mese" tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} width={44} />
                 <Tooltip content={<ChartTip />} cursor={{ fill: "rgba(255,255,255,.04)" }} />
-                <Area type="monotone" dataKey="Lordo" stroke="#93C5FD" strokeWidth={2} fill="url(#gLordo)" animationDuration={900} />
-                <Bar dataKey="Base" name="Netto base" stackId="n" fill="#5EEAD4" fillOpacity={0.9} maxBarSize={34} radius={[0, 0, 0, 0]} animationDuration={800} />
-                <Bar dataKey="Extra" name="Extra (bonus, 13ª…)" stackId="n" fill="#FBBF24" fillOpacity={0.9} maxBarSize={34} radius={[5, 5, 0, 0]} animationDuration={800} />
+                
+                {/* 4 Aree impilate. L'ordine nel codice determina l'ordine dal basso verso l'alto sul grafico */}
+                <Area type="monotone" dataKey="nettoBase" name="Netto base" stackId="1" stroke="#38BDF8" strokeWidth={2} fill="url(#gNettoBase)" animationDuration={800} />
+                <Area type="monotone" dataKey="nettoExtra" name="Extra netti" stackId="1" stroke="#5EEAD4" strokeWidth={2} fill="url(#gNettoExtra)" animationDuration={800} />
+                <Area type="monotone" dataKey="trattExtra" name="Tratt. su extra" stackId="1" stroke="#FDA4AF" strokeWidth={2} fill="url(#gTrattExtra)" animationDuration={800} />
+                <Area type="monotone" dataKey="trattBase" name="Tratt. base" stackId="1" stroke="#FB7185" strokeWidth={2} fill="url(#gTrattBase)" animationDuration={800} />
               </ComposedChart>
             ) : (
-              <ComposedChart data={st.anni}>
+              <ComposedChart data={chartDataAnni}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
                 <XAxis dataKey="anno" tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} width={48} />
                 <Tooltip content={<ChartTip />} cursor={{ fill: "rgba(255,255,255,.04)" }} />
-                <Bar dataKey="Lordo" fill="#93C5FD" fillOpacity={0.85} maxBarSize={46} radius={[6, 6, 0, 0]} animationDuration={900} />
-                <Bar dataKey="Netto" fill="#5EEAD4" fillOpacity={0.9} maxBarSize={46} radius={[6, 6, 0, 0]} animationDuration={900} />
+                
+                {/* Rimosso stackId="1". Aggiunto radius a tutte e ridotto maxBarSize */}
+                <Bar dataKey="nettoBase" name="Netto base" fill="#38BDF8" fillOpacity={0.9} maxBarSize={32} radius={[4, 4, 0, 0]} animationDuration={900} />
+                <Bar dataKey="nettoExtra" name="Extra netti" fill="#5EEAD4" fillOpacity={0.9} maxBarSize={32} radius={[4, 4, 0, 0]} animationDuration={900} />
+                <Bar dataKey="trattExtra" name="Tratt. su extra" fill="#FDA4AF" fillOpacity={0.9} maxBarSize={32} radius={[4, 4, 0, 0]} animationDuration={900} />
+                <Bar dataKey="trattBase" name="Tratt. base" fill="#FB7185" fillOpacity={0.9} maxBarSize={32} radius={[4, 4, 0, 0]} animationDuration={900} />
               </ComposedChart>
             )}
           </ResponsiveContainer>
