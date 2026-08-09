@@ -1547,6 +1547,31 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
     return valueAtOrBefore(carrieraStats.tfrSerie, "mk", "totale", mk);
   }, [carrieraStats, valueAtOrBefore]);
 
+  const interpolateMonthly = useCallback((iso, getValueFn) => {
+    const mk = monthKey(iso);
+    const prevMk = addMonthsMk(mk, -1);
+    
+    const prevVal = getValueFn(prevMk);
+    const currVal = getValueFn(mk);
+    
+    const d = parseInt(iso.slice(8, 10), 10); // estrae il giorno (es. 15)
+    const nowIso = todayISO();
+    
+    // Se siamo nel mese in corso, interpoliamo fino a 'oggi'
+    if (mk === monthKey(nowIso)) {
+      const todayD = new Date().getDate();
+      const frac = todayD > 0 ? d / todayD : 1;
+      return prevVal + (currVal - prevVal) * Math.min(1, frac);
+    } 
+    // Altrimenti interpoliamo sull'intero mese (passato)
+    else {
+      const [y, m] = mk.split("-").map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const frac = d / daysInMonth;
+      return prevVal + (currVal - prevVal) * frac;
+    }
+  }, []);
+
   const componentValues = useMemo(() => ({
     liquidi: patrimonio,
     investimenti: investimentiAt(selMonth),
@@ -1570,10 +1595,12 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
   };
 
   const seriePatrimonio = useMemo(() => series.map((point) => {
-    const mk = monthKey(point.iso);
     const liquidi = point.valore || 0;
-    const investimenti = investimentiAt(mk);
-    const tfr = tfrAt(mk);
+    
+    // Invece del gradino secco, usiamo la nostra nuova interpolazione!
+    const investimenti = interpolateMonthly(point.iso, investimentiAt);
+    const tfr = interpolateMonthly(point.iso, tfrAt);
+    
     return {
       ...point,
       valore: Math.round(
@@ -1582,7 +1609,7 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
         (patrimonioToggles.tfr ? tfr : 0)
       ),
     };
-  }), [series, patrimonioToggles, investimentiAt, tfrAt]);
+  }), [series, patrimonioToggles, investimentiAt, tfrAt, interpolateMonthly]);
 
   const deltaPatrimonio = useMemo(() => {
     const current = patrimonioVisualizzato;
