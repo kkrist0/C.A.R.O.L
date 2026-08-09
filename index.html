@@ -4202,7 +4202,7 @@ const VOCI_BUSTA = [
   { k: "trattenute", l: "Trattenute", tone: "#FB7185" },
 ];
 /* quanto entra davvero in tasca in quel mese */
-const nettoTotale = (p) => (p.netto || 0) + (p.bonus || 0) + (p.straordinari || 0) + (p.rimborsi || 0) + (p.premio || 0) + (p.tredicesima || 0) + (p.quattordicesima || 0) + (p.altre || 0) - (p.trattenute || 0);
+const nettoTotale = (p) => (p.lordo || 0) + (p.bonus || 0) + (p.straordinari || 0) + (p.rimborsi || 0) + (p.premio || 0) + (p.tredicesima || 0) + (p.quattordicesima || 0) + (p.altre || 0) - (p.trattenute || 0);
 const TFR_DIVISORE = 13.5;      // quota annua di TFR = retribuzione / 13,5
 const TFR_CONTRIBUTO = 0.005;   // 0,5% trattenuto per il fondo di garanzia INPS
 const TFR_RIVAL_BASE = 0.015;   // rivalutazione annua: 1,5% fisso + 75% dell'inflazione
@@ -5294,8 +5294,16 @@ function estraiIdCartella(v) {
 /* ---- Busta paga: tutte le voci, ognuna modificabile ---- */
 function BustaModal({ open, busta, jobs, anno, onClose, onSave, notify }) {
   const [f, setF] = useState(null);
+  
+  // Aggiungiamo lo stato per espandere/collassare le voci aggiuntive (chiuso di default)
+  const [showExtra, setShowExtra] = useState(false);
+  
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // Quando il modale si chiude, resettiamo anche l'accordion
+      setShowExtra(false);
+      return;
+    }
     const b = busta || {};
     setF({
       id: b.id || uid(), jobId: b.jobId || jobs[0]?.id || "", mese: b.mese || mkOf(anno, new Date().getMonth()),
@@ -5305,11 +5313,21 @@ function BustaModal({ open, busta, jobs, anno, onClose, onSave, notify }) {
       quattordicesima: b.quattordicesima ?? "", altre: b.altre ?? "", trattenute: b.trattenute ?? "",
       note: b.note || "", auto: false,
     });
+    
+    // Se stiamo modificando una busta paga che HA già delle voci extra, 
+    // apriamo l'accordion in automatico per comodità!
+    if (b.bonus || b.straordinari || b.rimborsi || b.tredicesima || b.quattordicesima) {
+      setShowExtra(true);
+    }
   }, [open, busta, jobs, anno]);
+
   if (!open || !f) return null;
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const num = (v) => Number(v) || 0;
-  const totale = num(f.netto) + num(f.bonus) + num(f.straordinari) + num(f.rimborsi) + num(f.premio) + num(f.tredicesima) + num(f.quattordicesima) + num(f.altre) - num(f.trattenute);
+  
+  const nettoCalcolato = num(f.lordo) - num(f.trattenute);
+  const totale = nettoCalcolato + num(f.bonus) + num(f.straordinari) + num(f.rimborsi) + num(f.premio) + num(f.tredicesima) + num(f.quattordicesima) + num(f.altre);
+  
   const { y, m } = parseMk(f.mese);
 
   const campo = (k, label) => (
@@ -5334,40 +5352,80 @@ function BustaModal({ open, busta, jobs, anno, onClose, onSave, notify }) {
           <div><Label>Contratto</Label><Select value={f.jobId} onChange={(e) => set("jobId", e.target.value)}>{jobs.map((j) => <option key={j.id} value={j.id}>{j.azienda} · {j.ruolo}</option>)}</Select></div>
         )}
         <div><Label>RAL del periodo</Label><Input type="number" inputMode="decimal" placeholder="es. 34000" value={f.ral} onChange={(e) => set("ral", e.target.value)} /></div>
+        
         <div className="grid grid-cols-2 gap-3">
           {campo("lordo", "Stipendio lordo")}
-          {campo("netto", "Stipendio netto")}
-        </div>
-        <p className="text-[11px] uppercase tracking-wider text-slate-500 pt-1">Voci aggiuntive</p>
-        <div className="grid grid-cols-2 gap-3">
-          {campo("bonus", "Bonus")}
-          {campo("straordinari", "Straordinari")}
-          {campo("rimborsi", "Rimborso spese")}
-          {campo("premio", "Premio")}
-          {campo("tredicesima", "Tredicesima")}
-          {campo("quattordicesima", "Quattordicesima")}
-          {campo("altre", "Altre competenze")}
           {campo("trattenute", "Trattenute")}
         </div>
+
         <div className="grid grid-cols-2 gap-3">
-          {campo("tfr", "TFR maturato nel mese")}
-          <div className="flex items-end"><p className="text-[11px] text-slate-500 pb-2">Se lasci vuoto, l'app lo calcola dalla retribuzione.</p></div>
+          <div>
+            {campo("tfr", "TFR maturato nel mese")}
+            <p className="text-[10px] text-slate-500 mt-1 leading-tight">Se vuoto, calcolato in automatico.</p>
+          </div>
+          <div>
+            <Label>Note</Label>
+            <Input placeholder="es. permessi non retribuiti" value={f.note} onChange={(e) => set("note", e.target.value)} />
+          </div>
         </div>
-        <div><Label>Note</Label><Input placeholder="es. mese con permessi non retribuiti" value={f.note} onChange={(e) => set("note", e.target.value)} /></div>
+
+        {/* --- INIZIO SEZIONE COLLASSABILE --- */}
+        <div className="pt-2">
+          <button 
+            type="button" 
+            onClick={() => setShowExtra(!showExtra)}
+            className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors w-full text-left outline-none"
+          >
+            <span 
+              className="transition-transform duration-300" 
+              style={{ transform: showExtra ? "rotate(0deg)" : "rotate(-90deg)" }}
+            >
+              ▼
+            </span>
+            Voci aggiuntive
+          </button>
+          
+          {/* Contenitore animato a comparsa fluida */}
+          <div 
+            className={`grid transition-all duration-600 ease-in-out ${
+              showExtra ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0 mt-0"
+            }`}
+          >
+            <div className="overflow-hidden">
+              {/* pb-1 serve per non tagliare eventuali ombre o bordi di focus degli input */}
+              <div className="grid grid-cols-2 gap-3 pb-1">
+                {campo("bonus", "Bonus")}
+                {campo("straordinari", "Straordinari")}
+                {campo("rimborsi", "Rimborso spese")}
+                {campo("tredicesima", "Tredicesima")}
+                {campo("quattordicesima", "Quattordicesima")}
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* --- FINE SEZIONE COLLASSABILE --- */}
+        
         <CedolinoBox payslipId={f.id} valore={f.cedolino} onChange={(c) => set("cedolino", c)} notify={notify} mese={f.mese} />
+        
         <div className="rounded-xl bg-white/[0.04] border border-white/[0.07] p-3 flex items-center justify-between">
           <span className="text-xs text-slate-400">Totale percepito nel mese</span>
           <span className="font-display text-lg text-teal-300 tabular-nums">{eur(totale)}</span>
         </div>
       </div>
+
       <div className="modal-actions flex justify-end gap-3 mt-5">
         <BtnGhost onClick={onClose}>Annulla</BtnGhost>
         <BtnPrimary onClick={() => onSave({
           id: f.id, jobId: f.jobId, mese: f.mese, auto: false, note: f.note,
           ral: num(f.ral), tfr: num(f.tfr), cedolino: f.cedolino,
-          lordo: num(f.lordo), netto: num(f.netto), bonus: num(f.bonus), straordinari: num(f.straordinari),
-          rimborsi: num(f.rimborsi), premio: num(f.premio), tredicesima: num(f.tredicesima),
-          quattordicesima: num(f.quattordicesima), altre: num(f.altre), trattenute: num(f.trattenute),
+          lordo: num(f.lordo), 
+          netto: nettoCalcolato, 
+          bonus: num(f.bonus), straordinari: num(f.straordinari),
+          rimborsi: num(f.rimborsi), 
+          premio: num(f.premio), 
+          tredicesima: num(f.tredicesima), quattordicesima: num(f.quattordicesima), 
+          altre: num(f.altre), 
+          trattenute: num(f.trattenute),
         })}>{busta?.id ? "Salva modifiche" : "Aggiungi"}</BtnPrimary>
       </div>
     </Modal>
