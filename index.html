@@ -6167,7 +6167,7 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
                     <YAxis tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} width={48} />
                     <Tooltip content={<ChartTip />} />
                     <Area type="monotone" dataKey="Investito" stroke="#A5B4FC" strokeWidth={2.5} fill="url(#ginv)" animationDuration={1000} />
-                    <Line type="monotone" dataKey="Valore" stroke="#5EEAD4" strokeWidth={2.5} dot={{ r: 4, fill: "#5EEAD4" }} animationDuration={1100} connectNulls={false} />
+                    <Line type="monotone" dataKey="Valore" stroke="#5EEAD4" strokeWidth={2.5} dot={false} animationDuration={1000} connectNulls={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
