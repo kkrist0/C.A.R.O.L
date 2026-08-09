@@ -1010,7 +1010,22 @@ function App() {
   }, [txs, data]);
 
   const [chartRange, setChartRange] = useState(30);
-  const series = useMemo(() => wealthSeries(chartRange, anchorIso), [wealthSeries, chartRange, anchorIso]);
+
+  // Calcola i giorni totali se l'utente sceglie "Tutto"
+  const actualDays = useMemo(() => {
+    if (chartRange === "all") {
+      if (!txs || txs.length === 0) return 30; // Fallback se non ci sono movimenti
+      // txs è ordinato dal più recente al più vecchio, quindi l'ultimo è il più vecchio
+      const oldestDate = new Date(txs[txs.length - 1].data);
+      const endDate = new Date(anchorIso);
+      const diffDays = Math.ceil((endDate - oldestDate) / (1000 * 60 * 60 * 24));
+      return Math.max(diffDays, 30); // Mostra sempre almeno 30 giorni per estetica
+    }
+    return chartRange;
+  }, [chartRange, txs, anchorIso]);
+
+  // Passiamo actualDays alla funzione che genera il grafico
+  const series = useMemo(() => wealthSeries(actualDays, anchorIso), [wealthSeries, actualDays, anchorIso]);
   const deltaMese = cur.risparmio + cur.inv;
 
   /* ---------- Insight ---------- */
@@ -1674,11 +1689,16 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
             </div>
             {/* Selettore Tempo */}
             <div className="flex gap-1 bg-white/5 rounded-xl p-1">
-              {[{ l: "7g", v: 7 }, { l: "1M", v: 30 }, { l: "3M", v: 90 }, { l: "1A", v: 365 }].map((r) => (
+              {[
+                { l: "1M", v: 30 }, 
+                { l: "3M", v: 90 }, 
+                { l: "1Y", v: 365 }, 
+                { l: "All", v: "all" }
+              ].map((r) => (
                 <button 
                   key={r.v} 
                   onClick={() => setChartRange(r.v)} 
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs transition-all text-center ${chartRange === r.v ? "bg-white/15 text-white" : "text-slate-400 hover:text-white"}`}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all text-center ${chartRange == r.v ? "bg-white/15 text-white" : "text-slate-400 hover:text-white"}`}
                 >
                   {r.l}
                 </button>
