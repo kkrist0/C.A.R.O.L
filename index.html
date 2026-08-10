@@ -1545,45 +1545,55 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
   }, [data.settings?.patrimonioToggles?.liquidi, data.settings?.patrimonioToggles?.investimenti, data.settings?.patrimonioToggles?.tfr]); // eslint-disable-line
 
   const pf = usePortfolio(data.assets || [], data.trades || [], data.quotes || {}, data.portfolioSnapshots || []);
-  /* Aggiorna le quotazioni in background all'apertura della Dashboard */
-  useEffect(() => {
-    if (!pf.aperte || pf.aperte.length === 0) return;
-    const aggiornaQuotazioniBackground = async () => {
-      let ciSonoAggiornamenti = false;
-      const nuoviDati = {};
-      for (const a of pf.aperte) {
-        try {
-          const q = await marketData.quote(a, { forza: true });
-          nuoviDati[a.id] = {
-            prezzo: q.prezzo,
-            variazione: q.variazione,
-            valuta: q.valuta || a.valuta,
-            fonte: q.fonte,
-            aggiornato: new Date().toISOString()
-          };
-          ciSonoAggiornamenti = true;
-        } catch (e) {
-          // Ignoriamo gli errori silenziosamente sulla Dashboard
+  const [isUpdatingQuotes, setIsUpdatingQuotes] = useState(false);
+
+  /* Funzione per aggiornare le quotazioni, usata all'avvio e al click */
+  const forceUpdateQuotes = async () => {
+    if (!pf.aperte || pf.aperte.length === 0 || isUpdatingQuotes) return;
+    setIsUpdatingQuotes(true);
+
+    let ciSonoAggiornamenti = false;
+    const nuoviDati = {};
+
+    for (const a of pf.aperte) {
+      try {
+        const q = await marketData.quote(a, { forza: true });
+        nuoviDati[a.id] = {
+          prezzo: q.prezzo,
+          variazione: q.variazione,
+          valuta: q.valuta || a.valuta,
+          fonte: q.fonte,
+          aggiornato: new Date().toISOString()
+        };
+        ciSonoAggiornamenti = true;
+      } catch (e) {
+        // Ignoriamo gli errori silenziosamente sulla Dashboard
+      }
+    }
+
+    if (ciSonoAggiornamenti) {
+      update((d) => {
+        if (!d.quotes) d.quotes = {};
+        const oggi = new Date().toISOString().slice(0, 10);
+        
+        for (const [id, qData] of Object.entries(nuoviDati)) {
+          d.quotes[id] = { ...(d.quotes[id] || {}), ...qData };
+          const st = d.quotes[id].storico || [];
+          const senzaOggi = st.filter((p) => p.data !== oggi);
+          d.quotes[id].storico = [...senzaOggi, { data: oggi, prezzo: qData.prezzo }].slice(-400);
         }
-      }
-      if (ciSonoAggiornamenti) {
-        update((d) => {
-          if (!d.quotes) d.quotes = {};
-          const oggi = new Date().toISOString().slice(0, 10);
-          for (const [id, qData] of Object.entries(nuoviDati)) {
-            d.quotes[id] = { ...(d.quotes[id] || {}), ...qData };
-            
-            // Aggiorna anche lo storico per i grafici
-            const st = d.quotes[id].storico || [];
-            const senzaOggi = st.filter((p) => p.data !== oggi);
-            d.quotes[id].storico = [...senzaOggi, { data: oggi, prezzo: qData.prezzo }].slice(-400);
-          }
-          return d;
-        });
-      }
-    };
-    aggiornaQuotazioniBackground();
-  }, []); // Esegue solo una volta quando la Dashboard viene montata
+        return d;
+      });
+    }
+    
+    setIsUpdatingQuotes(false);
+  };
+
+  // Esegue l'aggiornamento in automatico all'apertura della pagina
+  useEffect(() => {
+    forceUpdateQuotes();
+  }, []); // eslint-disable-line
+
   const carrieraStats = useCarrieraStats(data, new Date().getFullYear());
 
   const valueAtOrBefore = useCallback((rows, key, valueKey, mk) => {
@@ -1698,7 +1708,22 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
         <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-indigo-400 to-teal-300" />
         <div className="relative flex flex-col md:flex-row md:items-start justify-between gap-5">
           <div key={selMonth} style={{ animation: "fadeUp .4s both" }}>
-            <p className="text-sm text-slate-400 mb-1">{isCurrentMonth ? "Financial Net Worth" : `Patrimonio a fine ${labelMk(selMonth).toLowerCase()}`}</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-slate-400">
+                {isCurrentMonth ? "Financial Net Worth" : `Patrimonio a fine ${labelMk(selMonth).toLowerCase()}`}
+              </p>
+              {/* Mostra il tasto di aggiornamento solo sul mese in corso e se ci sono investimenti */}
+              {isCurrentMonth && pf.aperte?.length > 0 && (
+                <button 
+                  onClick={forceUpdateQuotes} 
+                  disabled={isUpdatingQuotes}
+                  className={`text-slate-500 hover:text-white transition-all text-xs flex items-center justify-center w-5 h-5 rounded-md hover:bg-white/10 ${isUpdatingQuotes ? "animate-spin text-white" : ""}`}
+                  title="Aggiorna quotazioni investimenti"
+                >
+                  ⟳
+                </button>
+              )}
+            </div>
             <CountEur value={patrimonioVisualizzato} cls="font-display text-3xl sm:text-4xl md:text-5xl text-white tracking-tight tabular-nums" />
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               <Chip tone={deltaPatrimonio >= 0 ? "up" : "down"}>{deltaPatrimonio >= 0 ? "▲" : "▼"} {eur(Math.abs(deltaPatrimonio))}</Chip>
