@@ -1545,6 +1545,45 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
   }, [data.settings?.patrimonioToggles?.liquidi, data.settings?.patrimonioToggles?.investimenti, data.settings?.patrimonioToggles?.tfr]); // eslint-disable-line
 
   const pf = usePortfolio(data.assets || [], data.trades || [], data.quotes || {}, data.portfolioSnapshots || []);
+  /* Aggiorna le quotazioni in background all'apertura della Dashboard */
+  useEffect(() => {
+    if (!pf.aperte || pf.aperte.length === 0) return;
+    const aggiornaQuotazioniBackground = async () => {
+      let ciSonoAggiornamenti = false;
+      const nuoviDati = {};
+      for (const a of pf.aperte) {
+        try {
+          const q = await marketData.quote(a, { forza: true });
+          nuoviDati[a.id] = {
+            prezzo: q.prezzo,
+            variazione: q.variazione,
+            valuta: q.valuta || a.valuta,
+            fonte: q.fonte,
+            aggiornato: new Date().toISOString()
+          };
+          ciSonoAggiornamenti = true;
+        } catch (e) {
+          // Ignoriamo gli errori silenziosamente sulla Dashboard
+        }
+      }
+      if (ciSonoAggiornamenti) {
+        update((d) => {
+          if (!d.quotes) d.quotes = {};
+          const oggi = new Date().toISOString().slice(0, 10);
+          for (const [id, qData] of Object.entries(nuoviDati)) {
+            d.quotes[id] = { ...(d.quotes[id] || {}), ...qData };
+            
+            // Aggiorna anche lo storico per i grafici
+            const st = d.quotes[id].storico || [];
+            const senzaOggi = st.filter((p) => p.data !== oggi);
+            d.quotes[id].storico = [...senzaOggi, { data: oggi, prezzo: qData.prezzo }].slice(-400);
+          }
+          return d;
+        });
+      }
+    };
+    aggiornaQuotazioniBackground();
+  }, []); // Esegue solo una volta quando la Dashboard viene montata
   const carrieraStats = useCarrieraStats(data, new Date().getFullYear());
 
   const valueAtOrBefore = useCallback((rows, key, valueKey, mk) => {
