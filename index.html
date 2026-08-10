@@ -1552,6 +1552,9 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
     if (!pf.aperte || pf.aperte.length === 0 || isUpdatingQuotes) return;
     setIsUpdatingQuotes(true);
 
+    const cfg = data.settings?.market || {};
+    marketData.configura(cfg);
+
     let ciSonoAggiornamenti = false;
     const nuoviDati = {};
 
