@@ -1049,7 +1049,7 @@ function App() {
       : `Ottimo: −${Math.round(-best.diff)}% in ${catById[best.k]?.nome} rispetto al mese precedente.`);
     if (cur.entrate > 0) out.push(`Tasso di risparmio del mese: ${Math.round(((cur.risparmio + cur.inv) / cur.entrate) * 100)}% delle entrate.`);
     const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
-    if (top) out.push(`${catById[top[0]]?.icona || ""} ${catById[top[0]]?.nome} è la categoria più costosa del mese (${eur0(top[1])}).`);
+    if (top) out.push(`${catById[top[0]]?.icona || ""} ${catById[top[0]]?.nome} è la categoria più costosa del mese (${eur(top[1])}).`);
     return out;
   }, [cur, prev, catById]);
 
@@ -1662,10 +1662,10 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
             <p className="text-sm text-slate-400 mb-1">{isCurrentMonth ? "Financial Net Worth" : `Patrimonio a fine ${labelMk(selMonth).toLowerCase()}`}</p>
             <CountEur value={patrimonioVisualizzato} cls="font-display text-3xl sm:text-4xl md:text-5xl text-white tracking-tight tabular-nums" />
             <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <Chip tone={deltaPatrimonio >= 0 ? "up" : "down"}>{deltaPatrimonio >= 0 ? "▲" : "▼"} {eur0(Math.abs(deltaPatrimonio))}</Chip>
+              <Chip tone={deltaPatrimonio >= 0 ? "up" : "down"}>{deltaPatrimonio >= 0 ? "▲" : "▼"} {eur(Math.abs(deltaPatrimonio))}</Chip>
               {!isCurrentMonth && <Chip>Vista storica</Chip>}
-              {patrimonioToggles.investimenti && componentValues.investimenti > 0 && <Chip>{eur0(componentValues.investimenti)} {toggleItems.find(i => i.key === "investimenti")?.label}</Chip>}
-              {patrimonioToggles.tfr && componentValues.tfr > 0 && <Chip>{eur0(componentValues.tfr)} {toggleItems.find(i => i.key === "tfr")?.label}</Chip>}
+              {patrimonioToggles.investimenti && componentValues.investimenti > 0 && <Chip>{eur(componentValues.investimenti)} {toggleItems.find(i => i.key === "investimenti")?.label}</Chip>}
+              {patrimonioToggles.tfr && componentValues.tfr > 0 && <Chip>{eur(componentValues.tfr)} {toggleItems.find(i => i.key === "tfr")?.label}</Chip>}
             </div>
           </div>
           <div className="flex flex-col items-stretch gap-2 shrink-0 w-full md:w-auto mt-1 md:mt-0">
@@ -1991,7 +1991,7 @@ function Movimenti({ txs, catById, accById, data, setTxModal, softDelete }) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          {chartAvg > 0 && <p className="text-[11px] text-slate-500 mt-2">Media dei mesi con spese: <b className="text-slate-300">{eur0(chartAvg)}</b> · i mesi sopra la media meritano un'occhiata.</p>}
+          {chartAvg > 0 && <p className="text-[11px] text-slate-500 mt-2">Media dei mesi con spese: <b className="text-slate-300">{eur(chartAvg)}</b> · i mesi sopra la media meritano un'occhiata.</p>}
           {catDist.entries.length > 0 && (
             <div className="mt-4 space-y-2">
               <p className="text-[11px] uppercase tracking-wider text-slate-500">Distribuzione categorie</p>
@@ -2004,7 +2004,7 @@ function Movimenti({ txs, catById, accById, data, setTxModal, softDelete }) {
                     <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${(v / catDist.max) * 100}%`, background: c?.colore || "#8B9DF9" }} />
                     </div>
-                    <span className="text-xs text-slate-400 tabular-nums w-20 text-right shrink-0">{eur0(v)}</span>
+                    <span className="text-xs text-slate-400 tabular-nums w-20 text-right shrink-0">{eur(v)}</span>
                   </div>
                 );
               })}
@@ -2040,14 +2040,14 @@ function Movimenti({ txs, catById, accById, data, setTxModal, softDelete }) {
                     {labelMk(g.mk)}
                   </h3>
                   <div className="flex gap-2 text-xs">
-                    {g.spese > 0 && <Chip tone="down">Spese {eur0(g.spese)}</Chip>}
-                    {g.entrate > 0 && <Chip tone="up">Entrate {eur0(g.entrate)}</Chip>}
+                    {g.spese > 0 && <Chip tone="down">Spese {eur(g.spese)}</Chip>}
+                    {g.entrate > 0 && <Chip tone="up">Entrate {eur(g.entrate)}</Chip>}
                   </div>
                 </div>
                 {isExpanded && (
                   <div style={{ animation: "fadeIn .2s ease-out" }}>
                     <TxList txs={g.list} catById={catById} accById={accById} onEdit={setTxModal} onDelete={softDelete} />
-                    <p className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-white/[0.05] text-right">Totale {MESI[parseMk(g.mk).m]}: <b className="text-slate-300">{eur0(g.spese)}</b> di spese{g.entrate > 0 ? ` · ${eur0(g.entrate)} di entrate` : ""}</p>
+                    <p className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-white/[0.05] text-right">Totale {MESI[parseMk(g.mk).m]}: <b className="text-slate-300">{eur(g.spese)}</b> di spese{g.entrate > 0 ? ` · ${eur(g.entrate)} di entrate` : ""}</p>
                   </div>
                 )}
               </Card>
@@ -3213,7 +3213,7 @@ function ViaggiPage({ data, update, notify, setConfirmDlg, catById }) {
               {countryInfo ? (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
                   <div><p className="text-[11px] text-slate-500">Viaggi</p><p className="text-white tabular-nums">{countryInfo.n}</p></div>
-                  <div><p className="text-[11px] text-slate-500">Spesa totale</p><p className="text-white tabular-nums">{eur0(countryInfo.spesa)}</p></div>
+                  <div><p className="text-[11px] text-slate-500">Spesa totale</p><p className="text-white tabular-nums">{eur(countryInfo.spesa)}</p></div>
                   <div><p className="text-[11px] text-slate-500">Ultima visita</p><p className="text-white">{fmtDate(countryInfo.ultima)}</p></div>
                   <div><p className="text-[11px] text-slate-500">Città</p><p className="text-white truncate">{[...countryInfo.citta].join(", ") || "—"}</p></div>
                 </div>
@@ -3232,11 +3232,11 @@ function ViaggiPage({ data, update, notify, setConfirmDlg, catById }) {
           {/* statistiche con delta annuale */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
             {[
-              { l: "Spesa totale viaggi", v: eur0(st.spesaTot), sub: `${eur0(quest.spesa)} quest'anno`, icon: "💳", tone: "text-white" },
+              { l: "Spesa totale viaggi", v: eur(st.spesaTot), sub: `${eur(quest.spesa)} quest'anno`, icon: "💳", tone: "text-white" },
               { l: "Paesi visitati", v: st.paesi, sub: quest.paesi ? `+${quest.paesi} quest'anno` : "—", icon: "🌍", tone: "text-sky-300" },
               { l: "Viaggi totali", v: st.nViaggi, sub: quest.viaggi ? `+${quest.viaggi} quest'anno` : "—", icon: "🧳", tone: "text-violet-300" },
               { l: "Distanza percorsa", v: `${st.km.toLocaleString("it-IT")} km`, sub: `${st.giorni} giorni fuori`, icon: "✈️", tone: "text-teal-300" },
-              { l: "Media a viaggio", v: eur0(st.mediaViaggio), sub: `${eur0(st.mediaGiorno)} al giorno`, icon: "📊", tone: "text-amber-300" },
+              { l: "Media a viaggio", v: eur(st.mediaViaggio), sub: `${eur(st.mediaGiorno)} al giorno`, icon: "📊", tone: "text-amber-300" },
             ].map((s, i) => (
               <Card key={s.l} className="p-4" delay={i * 45}>
                 <div className="flex items-start justify-between gap-2">
@@ -3330,7 +3330,7 @@ function TripPanel({ trip, spesa, expenses, onOpen, onNew }) {
             <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
               <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, pct)}%`, background: pct > 100 ? "#FB7185" : pct > 80 ? "#FBBF24" : trip.colore }} />
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">{Math.round(pct)}% del budget di {eur0(trip.budget)}</p>
+            <p className="text-[10px] text-slate-500 mt-1">{Math.round(pct)}% del budget di {eur(trip.budget)}</p>
           </div>
         )}
 
@@ -3342,7 +3342,7 @@ function TripPanel({ trip, spesa, expenses, onOpen, onNew }) {
                 <div key={c.id} className="flex items-center gap-2 text-[11px]">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.colore }} />
                   <span className="text-slate-300 truncate flex-1">{c.nome}</span>
-                  <span className="text-slate-400 tabular-nums">{eur0(c.value)}</span>
+                  <span className="text-slate-400 tabular-nums">{eur(c.value)}</span>
                   <span className="text-slate-600 w-9 text-right">{Math.round((c.value / tot) * 100)}%</span>
                 </div>
               ))}
@@ -3389,7 +3389,7 @@ const TripCard = memo(function TripCard({ trip, spesa, onOpen, onHighlight, acti
               </div>
             )}
           </div>
-          <span className={`text-sm tabular-nums font-medium shrink-0 ${over ? "text-rose-300" : "text-white"}`}>{eur0(spesa)}</span>
+          <span className={`text-sm tabular-nums font-medium shrink-0 ${over ? "text-rose-300" : "text-white"}`}>{eur(spesa)}</span>
         </div>
       </div>
     </div>
@@ -3561,15 +3561,15 @@ function TripDetail({ trip, data, update, notify, setConfirmDlg, onClose, onEdit
           {/* budget */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
             <Card className="p-3.5" hover={false}><p className="text-[11px] text-slate-500">Speso</p><CountEur value={totale} cls={`font-display text-lg tabular-nums ${pct > 100 ? "text-rose-300" : "text-white"}`} /></Card>
-            <Card className="p-3.5" hover={false}><p className="text-[11px] text-slate-500">Budget</p><p className="font-display text-lg text-slate-300 tabular-nums">{trip.budget > 0 ? eur0(trip.budget) : "—"}</p></Card>
-            <Card className="p-3.5" hover={false}><p className="text-[11px] text-slate-500">{gg} giorni · media</p><p className="font-display text-lg text-indigo-300 tabular-nums">{eur0(gg ? totale / gg : 0)}</p></Card>
+            <Card className="p-3.5" hover={false}><p className="text-[11px] text-slate-500">Budget</p><p className="font-display text-lg text-slate-300 tabular-nums">{trip.budget > 0 ? eur(trip.budget) : "—"}</p></Card>
+            <Card className="p-3.5" hover={false}><p className="text-[11px] text-slate-500">{gg} giorni · media</p><p className="font-display text-lg text-indigo-300 tabular-nums">{eur(gg ? totale / gg : 0)}</p></Card>
           </div>
           {trip.budget > 0 && (
             <div className="mb-4">
               <div className="h-2 rounded-full bg-white/5 overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, pct)}%`, background: pct > 100 ? "linear-gradient(90deg,#FB7185,#F43F5E)" : pct > 80 ? "linear-gradient(90deg,#FBBF24,#F59E0B)" : `linear-gradient(90deg,${trip.colore},#A5B4FC)` }} />
               </div>
-              <p className={`text-[11px] mt-1 ${pct > 100 ? "text-rose-300" : "text-slate-500"}`}>{pct > 100 ? `Budget superato di ${eur0(totale - trip.budget)}` : `${Math.round(pct)}% usato · restano ${eur0(trip.budget - totale)}`}</p>
+              <p className={`text-[11px] mt-1 ${pct > 100 ? "text-rose-300" : "text-slate-500"}`}>{pct > 100 ? `Budget superato di ${eur(totale - trip.budget)}` : `${Math.round(pct)}% usato · restano ${eur(trip.budget - totale)}`}</p>
             </div>
           )}
 
@@ -3595,7 +3595,7 @@ function TripDetail({ trip, data, update, notify, setConfirmDlg, onClose, onEdit
                       </div>
                       <div className="flex-1 space-y-1 text-xs max-h-24 overflow-y-auto min-w-0">
                         {byCat.slice(0, 6).map((c) => (
-                          <div key={c.name} className="flex justify-between gap-2"><span className="text-slate-300 truncate">{c.icona} {c.name}</span><span className="text-slate-400 tabular-nums">{eur0(c.value)}</span></div>
+                          <div key={c.name} className="flex justify-between gap-2"><span className="text-slate-300 truncate">{c.icona} {c.name}</span><span className="text-slate-400 tabular-nums">{eur(c.value)}</span></div>
                         ))}
                       </div>
                     </div>
@@ -3623,7 +3623,7 @@ function TripDetail({ trip, data, update, notify, setConfirmDlg, onClose, onEdit
           {tab === "spese" && (
             <div style={{ animation: "fadeUp .3s both" }}>
               <div className="flex justify-between items-center mb-3">
-                <p className="text-xs text-slate-500">{expenses.length} spese · {eur0(totale)}</p>
+                <p className="text-xs text-slate-500">{expenses.length} spese · {eur(totale)}</p>
                 <BtnPrimary onClick={() => setExpModal({})} className="!py-1.5 !text-xs">+ Spesa</BtnPrimary>
               </div>
               <div className="divide-y divide-white/[0.05]">
@@ -3660,12 +3660,12 @@ function TripDetail({ trip, data, update, notify, setConfirmDlg, onClose, onEdit
                   <div className="flex-1 pb-2 min-w-0">
                     <div className="flex justify-between items-baseline gap-2">
                       <p className="text-sm text-white capitalize">{d.label}</p>
-                      {d.tot > 0 && <span className="text-xs text-slate-400 tabular-nums">{eur0(d.tot)}</span>}
+                      {d.tot > 0 && <span className="text-xs text-slate-400 tabular-nums">{eur(d.tot)}</span>}
                     </div>
                     {d.spese.length ? (
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {d.spese.map((e) => { const c = tripCat(e.categoria); return (
-                          <span key={e.id} className="text-[11px] px-2 py-1 rounded-lg border" style={{ background: c.colore + "14", borderColor: c.colore + "33", color: "#e2e8f0" }}>{c.icona} {e.descrizione || c.nome} · {eur0(e.importo)}</span>
+                          <span key={e.id} className="text-[11px] px-2 py-1 rounded-lg border" style={{ background: c.colore + "14", borderColor: c.colore + "33", color: "#e2e8f0" }}>{c.icona} {e.descrizione || c.nome} · {eur(e.importo)}</span>
                         ); })}
                       </div>
                     ) : <p className="text-[11px] text-slate-600 mt-0.5">Nessuna spesa registrata</p>}
@@ -3929,8 +3929,8 @@ function TripStats({ st, trips, expenses }) {
   const cards = [
     { l: "Paese più visitato", v: st.topPaese ? `${countryFlag(st.topPaese[0])} ${countryLabel(st.topPaese[0])} · ${st.topPaese[1].n}` : "—" },
     { l: "Città più visitata", v: st.topCitta ? `${st.topCitta[0]} · ${st.topCitta[1]}` : "—" },
-    { l: "Spesa media a viaggio", v: eur0(st.mediaViaggio) },
-    { l: "Spesa media giornaliera", v: eur0(st.mediaGiorno) },
+    { l: "Spesa media a viaggio", v: eur(st.mediaViaggio) },
+    { l: "Spesa media giornaliera", v: eur(st.mediaGiorno) },
     { l: "Mese preferito", v: st.topMese ? `${MESI[+st.topMese[0]]} · ${st.topMese[1]} viaggi` : "—" },
     { l: "Anno con più viaggi", v: st.topAnno ? `${st.topAnno[0]} · ${st.topAnno[1]}` : "—" },
     { l: "Voli registrati", v: st.nVoli },
@@ -3986,7 +3986,7 @@ function TripStats({ st, trips, expenses }) {
               <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(c.value / perCat.max) * 100}%`, background: c.colore }} />
               </div>
-              <span className="text-xs text-slate-400 tabular-nums w-20 text-right shrink-0">{eur0(c.value)}</span>
+              <span className="text-xs text-slate-400 tabular-nums w-20 text-right shrink-0">{eur(c.value)}</span>
             </div>
           ))}
           {!perCat.arr.length && <EmptyState text="Nessuna spesa di viaggio registrata." />}
@@ -4029,7 +4029,7 @@ function Wishlist({ data, update, notify, setConfirmDlg, wishEdit, setWishEdit, 
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full border shrink-0" style={{ color: PRIO[w.priorita]?.c, borderColor: PRIO[w.priorita]?.c + "55", background: PRIO[w.priorita]?.c + "14" }}>{PRIO[w.priorita]?.l}</span>
               </div>
-              {w.costo > 0 && <p className="text-xs text-slate-400 mt-2 tabular-nums">Stima: {eur0(w.costo)}</p>}
+              {w.costo > 0 && <p className="text-xs text-slate-400 mt-2 tabular-nums">Stima: {eur(w.costo)}</p>}
               {w.note && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{w.note}</p>}
               <div className="flex gap-2 mt-3 flex-wrap">
                 <BtnPrimary onClick={() => onConvert(w)} className="!py-1.5 !text-xs">Trasforma in viaggio</BtnPrimary>
@@ -4224,10 +4224,10 @@ function useCarrieraStats(data, anno) {
       const p = payslips.find((x) => x.mese === mk);
       return {
         mk, mese: label,
-        Lordo: p ? Math.round(p.lordo || 0) : 0,
-        Netto: p ? Math.round(nettoTotale(p)) : 0,
-        Base: p ? Math.round(p.netto || 0) : 0,
-        Extra: p ? Math.round(nettoTotale(p) - (p.netto || 0)) : 0,
+        Lordo: p ? Math.round((p.lordo || 0) * 100) / 100 : 0,
+        Netto: p ? Math.round(nettoTotale(p) * 100) / 100 : 0,
+        Base: p ? Math.round((p.netto || 0) * 100) / 100 : 0,
+        Extra: p ? Math.round((nettoTotale(p) - (p.netto || 0)) * 100) / 100 : 0,
         busta: p || null,
         futuro: anno === new Date().getFullYear() && m > new Date().getMonth(),
       };
@@ -4256,7 +4256,9 @@ function useCarrieraStats(data, anno) {
       const a = (perAnno[y] = perAnno[y] || { anno: y, Lordo: 0, Netto: 0, mesi: 0 });
       a.Lordo += p.lordo || 0; a.Netto += nettoTotale(p); a.mesi++;
     });
-    const anni = Object.values(perAnno).map((a) => ({ ...a, Lordo: Math.round(a.Lordo), Netto: Math.round(a.Netto), mediaNetto: a.Netto / a.mesi })).sort((a, b) => a.anno.localeCompare(b.anno));
+    const anni = Object.values(perAnno)
+      .map((a) => ({ ...a, Lordo: Math.round(a.Lordo * 100) / 100, Netto: Math.round(a.Netto * 100) / 100, mediaNetto: a.Netto / a.mesi }))
+      .sort((a, b) => a.anno.localeCompare(b.anno));
     const idx = anni.findIndex((a) => a.anno === annoStr);
     const prec = idx > 0 ? anni[idx - 1] : null;
     const cur = anni[idx] || null;
@@ -4282,7 +4284,7 @@ function useCarrieraStats(data, anno) {
     });
     const tfrTotale = cumulato;
     const tfrAnno = tfrSerie.filter((t) => t.mk.startsWith(annoStr));
-    const tfrMaturatoAnno = tfrAnno.reduce((s, t) => s + t.maturato, 0);
+    const tfrMaturatoAnno = Math.round(tfrAnno.reduce((s, t) => s + t.maturato, 0) * 100) / 100;
     const tfrAnticipi = tfrSerie.reduce((s, t) => s + t.anticipo + t.liquidazione, 0);
 
     /* stima a fine anno in corso, sulla base della media mensile */
@@ -4461,10 +4463,10 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
       
       return {
         ...m,
-        nettoBase: Math.round(lordoBase - trattBase),
-        nettoExtra: Math.round(lordoExtraTassabile - trattExtra + rimborsi),
-        trattBase: Math.round(trattBase),
-        trattExtra: Math.round(trattExtra),
+        nettoBase: Math.round((lordoBase - trattBase) * 100) / 100,
+        nettoExtra: Math.round((lordoExtraTassabile - trattExtra + rimborsi) * 100) / 100,
+        trattBase: Math.round(trattBase * 100) / 100,
+        trattExtra: Math.round(trattExtra * 100) / 100,
       };
     });
   }, [st.mesiAnno]);
@@ -4492,10 +4494,10 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
       
       return {
         anno: y.anno,
-        nettoBase: Math.round(y.lordoBase - trattBase),
-        nettoExtra: Math.round(y.lordoExtra - trattExtra + y.rimborsi),
-        trattExtra: Math.round(trattExtra),
-        trattBase: Math.round(trattBase),
+        nettoBase: Math.round((y.lordoBase - trattBase) * 100) / 100,
+        nettoExtra: Math.round((y.lordoExtra - trattExtra + y.rimborsi) * 100) / 100,
+        trattExtra: Math.round(trattExtra * 100) / 100,
+        trattBase: Math.round(trattBase * 100) / 100,
       };
     });
   }, [st.payslips]);
@@ -4503,14 +4505,14 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
     <div style={{ animation: "fadeUp .4s both" }}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
         {[
-          { l: `Totale percepito ${anno}`, v: eur0(st.totNetto), sub: `${st.conDati.length} mesi registrati`, tone: "text-teal-300" },
-          { l: `Lordo ${anno}`, v: eur0(st.totLordo), sub: st.cur ? `media ${eur0(st.mediaLordo)}/mese` : "—", tone: "text-sky-300" },
-          { l: "Netto medio", v: eur0(st.mediaNetto), sub: "per mese registrato", tone: "text-white" },
-          { l: "Rispetto all'anno prima", v: st.crescita != null ? `${st.crescita >= 0 ? "+" : ""}${st.crescita.toFixed(1)}%` : "—", sub: st.prec ? `${anno - 1}: ${eur0(st.prec.Netto)}` : "nessun confronto", tone: st.crescita >= 0 ? "text-emerald-300" : "text-rose-300" },
-          { l: "Bonus e premi", v: eur0(st.totBonus), sub: st.mediaBonus > 0 ? `media ${eur0(st.mediaBonus)} quando c'è` : "nessuno quest'anno", tone: "text-amber-300" },
-          { l: "Straordinari", v: eur0(st.totStraordinari), sub: st.totRimborsi > 0 ? `+ ${eur0(st.totRimborsi)} di rimborsi` : "nessun rimborso", tone: "text-violet-300" },
-          { l: "Tasse e contributi stimati", v: eur0(st.tasseStimate), sub: `circa il ${st.aliquota.toFixed(0)}% del lordo`, tone: "text-rose-300" },
-          { l: "TFR maturato nell'anno", v: eur0(st.tfrMaturatoAnno), sub: `totale ${eur0(st.tfrTotale)}`, tone: "text-emerald-300" },
+          { l: `Totale percepito ${anno}`, v: eur(st.totNetto), sub: `${st.conDati.length} mesi registrati`, tone: "text-teal-300" },
+          { l: `Lordo ${anno}`, v: eur(st.totLordo), sub: st.cur ? `media ${eur(st.mediaLordo)}/mese` : "—", tone: "text-sky-300" },
+          { l: "Netto medio", v: eur(st.mediaNetto), sub: "per mese registrato", tone: "text-white" },
+          { l: "Rispetto all'anno prima", v: st.crescita != null ? `${st.crescita >= 0 ? "+" : ""}${st.crescita.toFixed(1)}%` : "—", sub: st.prec ? `${anno - 1}: ${eur(st.prec.Netto)}` : "nessun confronto", tone: st.crescita >= 0 ? "text-emerald-300" : "text-rose-300" },
+          { l: "Bonus e premi", v: eur(st.totBonus), sub: st.mediaBonus > 0 ? `media ${eur(st.mediaBonus)} quando c'è` : "nessuno quest'anno", tone: "text-amber-300" },
+          { l: "Straordinari", v: eur(st.totStraordinari), sub: st.totRimborsi > 0 ? `+ ${eur(st.totRimborsi)} di rimborsi` : "nessun rimborso", tone: "text-violet-300" },
+          { l: "Tasse e contributi stimati", v: eur(st.tasseStimate), sub: `circa il ${st.aliquota.toFixed(0)}% del lordo`, tone: "text-rose-300" },
+          { l: "TFR maturato nell'anno", v: eur(st.tfrMaturatoAnno), sub: `totale ${eur(st.tfrTotale)}`, tone: "text-emerald-300" },
         ].map((s, i) => (
           <Card key={s.l} className="p-4" delay={i * 45}>
             <p className="text-xs text-slate-400">{s.l}</p>
@@ -4590,7 +4592,7 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
                 <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
                   <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(x.v / max) * 100}%`, background: x.c }} />
                 </div>
-                <span className="text-xs text-slate-400 tabular-nums w-20 text-right shrink-0">{eur0(x.v)}</span>
+                <span className="text-xs text-slate-400 tabular-nums w-20 text-right shrink-0">{eur(x.v)}</span>
               </div>
             );
           })}
@@ -4623,8 +4625,8 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-white">
                         <span className="text-slate-500 text-[11px] mr-1.5">Netto:</span>
-                        <b className="tabular-nums font-display text-base">{eur0(nettoTotale(b))}</b>
-                        {b.lordo > 0 && <span className="text-[11px] text-slate-500 ml-2">lordo {eur0(b.lordo)}</span>}
+                        <b className="tabular-nums font-display text-base">{eur(nettoTotale(b))}</b>
+                        {b.lordo > 0 && <span className="text-[11px] text-slate-500 ml-2">lordo {eur(b.lordo)}</span>}
                       </p>
                       <p className="text-[11px] mt-0.5 flex items-center gap-1.5 flex-wrap">
                         {b.cedolino ? (
@@ -4632,10 +4634,10 @@ function SezioneStipendio({ st, anno, setBustaEdit, eliminaBusta, setGenOpen, jo
                         ) : (
                           <span className="text-slate-600">Nessun cedolino</span>
                         )}
-                        {(b.bonus > 0 || b.premio > 0) && <span className="text-amber-300/80">· bonus {eur0(b.bonus + b.premio)}</span>}
+                        {(b.bonus > 0 || b.premio > 0) && <span className="text-amber-300/80">· bonus {eur(b.bonus + b.premio)}</span>}
                         {b.tredicesima > 0 && <span className="text-emerald-300/70">· 13ª</span>}
                         {b.quattordicesima > 0 && <span className="text-emerald-300/70">· 14ª</span>}
-                        {b.straordinari > 0 && <span className="text-violet-300/70">· straord. {eur0(b.straordinari)}</span>}
+                        {b.straordinari > 0 && <span className="text-violet-300/70">· straord. {eur(b.straordinari)}</span>}
                         {b.auto && <span className="text-slate-600">· generata</span>}
                       </p>
                     </div>
@@ -4663,9 +4665,9 @@ function SezioneTfr({ st, anno, setTfrEdit }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
         {[
           { l: "TFR accantonato", v: eur(st.tfrTotale), sub: "al netto di anticipi", tone: "text-teal-300" },
-          { l: `Maturato nel ${anno}`, v: eur0(st.tfrMaturatoAnno), sub: `${serieAnno.length} mesi`, tone: "text-sky-300" },
+          { l: `Maturato nel ${anno}`, v: eur(st.tfrMaturatoAnno), sub: `${serieAnno.length} mesi`, tone: "text-sky-300" },
           { l: "Media mensile", v: eur(st.mediaTfrMese), sub: "ultimi 12 mesi", tone: "text-white" },
-          { l: "Anticipi e liquidazioni", v: eur0(st.tfrAnticipi), sub: st.tfrAnticipi > 0 ? "già percepiti" : "nessuno", tone: "text-amber-300" },
+          { l: "Anticipi e liquidazioni", v: eur(st.tfrAnticipi), sub: st.tfrAnticipi > 0 ? "già percepiti" : "nessuno", tone: "text-amber-300" },
         ].map((s, i) => (
           <Card key={s.l} className="p-4" delay={i * 45}>
             <p className="text-xs text-slate-400">{s.l}</p>
@@ -4720,9 +4722,9 @@ function SezioneTfr({ st, anno, setTfrEdit }) {
               <div key={t.mk} className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.05] cursor-pointer transition-colors" onClick={() => setTfrEdit({ mese: t.mk, maturato: t.maturato, rivalutazione: t.rivalutazione, anticipo: t.anticipo, liquidazione: t.liquidazione })}>
                 <span className="w-16 text-xs text-slate-400 shrink-0">{t.mese}</span>
                 <span className="text-xs text-slate-300 tabular-nums flex-1">+{eur(t.maturato)}</span>
-                {t.anticipo > 0 && <Chip tone="down">−{eur0(t.anticipo)}</Chip>}
+                {t.anticipo > 0 && <Chip tone="down">−{eur(t.anticipo)}</Chip>}
                 {t.manuale && <span className="text-[10px] text-indigo-300">manuale</span>}
-                <span className="text-xs text-white tabular-nums">{eur0(t.totale)}</span>
+                <span className="text-xs text-white tabular-nums">{eur(t.totale)}</span>
               </div>
             ))}
             {!serieAnno.length && <EmptyState text="Nessun dato per quest'anno: inserisci le buste paga o correggi un mese." />}
@@ -4751,7 +4753,7 @@ function SezioneContratti({ st, setJobEdit, setConfirmDlg, update, notify }) {
               {!j.fine && <Chip tone="up">in corso</Chip>}
             </div>
             <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-              <div><p className="text-slate-500">RAL</p><p className="text-white tabular-nums">{eur0(j.ral)}</p></div>
+              <div><p className="text-slate-500">RAL</p><p className="text-white tabular-nums">{eur(j.ral)}</p></div>
               <div><p className="text-slate-500">Mensilità</p><p className="text-white">{j.mensilita}</p></div>
               <div><p className="text-slate-500">Dal</p><p className="text-white">{j.assunzione ? fmtDate(j.assunzione) : "—"}</p></div>
             </div>
@@ -5612,7 +5614,7 @@ function JobModal({ open, job, onClose, onSave }) {
           <div><Label>Lordo mensile</Label><Input type="number" value={f.lordo} onChange={(e) => set("lordo", e.target.value)} placeholder="2300" /></div>
         </div>
         {ralNum > 0 && (
-          <p className="text-[11px] text-slate-500">Accantonamento TFR stimato: <b className="text-teal-300">{eur0(quotaTfrAnnua(ralNum))}</b> l'anno, circa {eur(quotaTfrAnnua(ralNum) / 12)} al mese.</p>
+          <p className="text-[11px] text-slate-500">Accantonamento TFR stimato: <b className="text-teal-300">{eur(quotaTfrAnnua(ralNum))}</b> l'anno, circa {eur(quotaTfrAnnua(ralNum) / 12)} al mese.</p>
         )}
         <button onClick={() => set("tfrInAzienda", !f.tfrInAzienda)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${f.tfrInAzienda ? "bg-indigo-400/10 border-indigo-400/40" : "bg-white/5 border-white/10"}`}>
           <span className={`w-10 rounded-full transition-all relative shrink-0 ${f.tfrInAzienda ? "bg-gradient-to-r from-indigo-400 to-violet-400" : "bg-white/10"}`} style={{ height: 22 }}>
@@ -6107,7 +6109,7 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
       d.portfolioSnapshots.sort((a, b) => a.mese.localeCompare(b.mese));
       return d;
     });
-    notify(`Snapshot salvato per ${labelMk(mk)}: ${eur0(valore)}`);
+    notify(`Snapshot salvato per ${labelMk(mk)}: ${eur(valore)}`);
   };
   const handleTimelineClick = (state) => {
     const payload = state?.activePayload || (Array.isArray(state) ? state[0]?.payload : null);
@@ -6147,7 +6149,7 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
       d.portfolioSnapshots.sort((a, b) => a.mese.localeCompare(b.mese));
       return d;
     });
-    notify(`Valutazione fine mese salvata per ${labelMk(snapshotMonth)}: ${eur0(valore)}`);
+    notify(`Valutazione fine mese salvata per ${labelMk(snapshotMonth)}: ${eur(valore)}`);
     setSnapshotValue("");
     setSnapshotNote("");
     setSnapshotModalOpen(false);
@@ -6305,13 +6307,13 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
                 <p className="text-sm text-slate-400 mb-1">Valore del portafoglio</p>
                 <CountEur value={pf.valore} cls="font-display text-3xl sm:text-4xl md:text-5xl text-white tracking-tight tabular-nums" />
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <Chip tone={pf.pl >= 0 ? "up" : "down"}>{pf.pl >= 0 ? "▲" : "▼"} {eur0(Math.abs(pf.pl))} ({pct(pf.plPct)})</Chip>
-                  {pf.varGiorno !== 0 && <Chip tone={pf.varGiorno >= 0 ? "up" : "down"}>oggi {pf.varGiorno >= 0 ? "+" : "−"}{eur0(Math.abs(pf.varGiorno))}</Chip>}
+                  <Chip tone={pf.pl >= 0 ? "up" : "down"}>{pf.pl >= 0 ? "▲" : "▼"} {eur(Math.abs(pf.pl))} ({pct(pf.plPct)})</Chip>
+                  {pf.varGiorno !== 0 && <Chip tone={pf.varGiorno >= 0 ? "up" : "down"}>oggi {pf.varGiorno >= 0 ? "+" : "−"}{eur(Math.abs(pf.varGiorno))}</Chip>}
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-xs text-slate-500">Capitale investito</p>
-                <p className="font-display text-xl text-slate-200 tabular-nums">{eur0(pf.investito)}</p>
+                <p className="font-display text-xl text-slate-200 tabular-nums">{eur(pf.investito)}</p>
               </div>
             </div>
             {pf.senzaPrezzi && (
@@ -6321,10 +6323,10 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
             {[
-              { l: "Profitto/perdita", v: eur0(pf.pl), sub: pct(pf.plPct), tone: plTone },
+              { l: "Profitto/perdita", v: eur(pf.pl), sub: pct(pf.plPct), tone: plTone },
               { l: "Rendimento annuo", v: pf.annuo != null ? pct(pf.annuo, 1) : "—", sub: "stima annualizzata", tone: (pf.annuo ?? 0) >= 0 ? "text-teal-300" : "text-rose-300" },
-              { l: "Dividendi incassati", v: eur0(pf.dividendi), sub: "totale storico", tone: "text-amber-300" },
-              { l: "Realizzato", v: eur0(pf.realizzato), sub: "da vendite chiuse", tone: pf.realizzato >= 0 ? "text-emerald-300" : "text-rose-300" },
+              { l: "Dividendi incassati", v: eur(pf.dividendi), sub: "totale storico", tone: "text-amber-300" },
+              { l: "Realizzato", v: eur(pf.realizzato), sub: "da vendite chiuse", tone: pf.realizzato >= 0 ? "text-emerald-300" : "text-rose-300" },
             ].map((c, i) => (
               <Card key={c.l} className="p-4" delay={i * 45}>
                 <p className="text-xs text-slate-400">{c.l}</p>
@@ -6380,7 +6382,7 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
                     <div key={s.mese} className="rounded-xl bg-white/5 border border-white/10 p-2">
                       <div className="flex items-center justify-between gap-3">
                         <span>{labelMk(s.mese)}</span>
-                        <span className="font-semibold tabular-nums">{eur0(s.valore)}</span>
+                        <span className="font-semibold tabular-nums">{eur(s.valore)}</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1 truncate">{s.note || "Salvato dal grafico"}</p>
                     </div>
@@ -6437,9 +6439,9 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm text-white tabular-nums">{eur0(p.valore)}</p>
+                    <p className="text-sm text-white tabular-nums">{eur(p.valore)}</p>
                     {p.qta > 0 && p.prezzo > 0 && (
-                      <p className={`text-[11px] tabular-nums ${p.pl >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{p.pl >= 0 ? "+" : ""}{eur0(p.pl)} · {pct(p.plPct, 1)}</p>
+                      <p className={`text-[11px] tabular-nums ${p.pl >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{p.pl >= 0 ? "+" : ""}{eur(p.pl)} · {pct(p.plPct, 1)}</p>
                     )}
                   </div>
                 </button>
@@ -6565,8 +6567,8 @@ function AssetDetail({ pos, onClose, onEdit, onTrade, onPrezzo, onDelete, onDelT
             </div>
             <div className="ml-auto text-right">
               <p className="text-xs text-slate-500">Valore posizione</p>
-              <p className="font-display text-xl text-white tabular-nums">{eur0(pos.valore)}</p>
-              {pos.qta > 0 && pos.prezzo > 0 && <span className={`text-xs ${su ? "text-emerald-300" : "text-rose-300"}`}>{su ? "+" : ""}{eur0(pos.pl)} · {pct(pos.plPct, 1)}</span>}
+              <p className="font-display text-xl text-white tabular-nums">{eur(pos.valore)}</p>
+              {pos.qta > 0 && pos.prezzo > 0 && <span className={`text-xs ${su ? "text-emerald-300" : "text-rose-300"}`}>{su ? "+" : ""}{eur(pos.pl)} · {pct(pos.plPct, 1)}</span>}
             </div>
           </div>
 
@@ -6605,7 +6607,7 @@ function AssetDetail({ pos, onClose, onEdit, onTrade, onPrezzo, onDelete, onDelT
             {[
               { l: "Quote", v: pos.qta.toLocaleString("it-IT", { maximumFractionDigits: 4 }) },
               { l: "Prezzo medio", v: eur(pos.medio) },
-              { l: "Investito", v: eur0(pos.costo) },
+              { l: "Investito", v: eur(pos.costo) },
               { l: "Commissioni", v: eur(pos.commissioni) },
             ].map((c) => (
               <div key={c.l} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
@@ -6640,7 +6642,7 @@ function AssetDetail({ pos, onClose, onEdit, onTrade, onPrezzo, onDelete, onDelT
                   <p className="text-sm text-white capitalize">{o.tipo}</p>
                   <p className="text-[11px] text-slate-500">{fmtDate(o.data)} · {o.quantita.toLocaleString("it-IT", { maximumFractionDigits: 4 })} × {eur(o.prezzo)}{o.commissioni ? ` · comm. ${eur(o.commissioni)}` : ""}</p>
                 </div>
-                <span className="text-sm text-slate-200 tabular-nums">{eur0(o.quantita * o.prezzo)}</span>
+                <span className="text-sm text-slate-200 tabular-nums">{eur(o.quantita * o.prezzo)}</span>
                 <button onClick={() => onDelTrade(o.id)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-rose-500/20 text-xs text-slate-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-all">🗑</button>
               </div>
             ))}
@@ -7017,7 +7019,7 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-white truncate">{c.nome}</p>
                   <p className="text-[11px] text-slate-500 truncate">
-                    {[c.sottocategorie.length ? `${c.sottocategorie.length} sottocategorie` : null, data.budgets[c.id] ? `budget ${eur0(data.budgets[c.id])}` : null, usage[c.id] ? `${usage[c.id]} movimenti` : "mai usata"].filter(Boolean).join(" · ")}
+                    {[c.sottocategorie.length ? `${c.sottocategorie.length} sottocategorie` : null, data.budgets[c.id] ? `budget ${eur(data.budgets[c.id])}` : null, usage[c.id] ? `${usage[c.id]} movimenti` : "mai usata"].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.colore }} />
@@ -7179,14 +7181,14 @@ function BudgetPage({ data, update, cur, catById, notify }) {
                   <span className="text-sm text-white">{c?.nome}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400 tabular-nums">{eur0(speso)} / {eur0(limite)}</span>
+                  <span className="text-xs text-slate-400 tabular-nums">{eur(speso)} / {eur(limite)}</span>
                   <button onClick={() => update((d) => { delete d.budgets[k]; return d; })} className="text-slate-600 hover:text-rose-300 text-xs transition-colors">✕</button>
                 </div>
               </div>
               <div className="h-2 rounded-full bg-white/5 overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${pct}%`, background: over ? "linear-gradient(90deg,#FB7185,#F43F5E)" : pct > 80 ? "linear-gradient(90deg,#FBBF24,#F59E0B)" : `linear-gradient(90deg,${c?.colore || "#8B9DF9"},#8B9DF9)` }} />
               </div>
-              <p className={`text-xs mt-1.5 ${over ? "text-rose-300" : "text-slate-500"}`}>{over ? `Superato di ${eur0(speso - limite)}` : `Restano ${eur0(limite - speso)}`}</p>
+              <p className={`text-xs mt-1.5 ${over ? "text-rose-300" : "text-slate-500"}`}>{over ? `Superato di ${eur(speso - limite)}` : `Restano ${eur(limite - speso)}`}</p>
             </Card>
           );
         })}
@@ -7496,12 +7498,12 @@ function Report({ txs, catById, monthStats, patrimonio, data, update }) {
       {/* stats del periodo */}
       <div key={"ps-" + periodLabel} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         {[
-          { l: `Entrate · ${mode === "mese" ? "mese" : "periodo"}`, v: eur0(pStats.entrate), tone: "text-emerald-300" },
-          { l: `Spese · ${mode === "mese" ? "mese" : "periodo"}`, v: eur0(pStats.uscite), tone: "text-rose-300" },
-          { l: "Risparmio", v: eur0(pStats.risparmio), tone: pStats.risparmio >= 0 ? "text-teal-300" : "text-rose-300" },
+          { l: `Entrate · ${mode === "mese" ? "mese" : "periodo"}`, v: eur(pStats.entrate), tone: "text-emerald-300" },
+          { l: `Spese · ${mode === "mese" ? "mese" : "periodo"}`, v: eur(pStats.uscite), tone: "text-rose-300" },
+          { l: "Risparmio", v: eur(pStats.risparmio), tone: pStats.risparmio >= 0 ? "text-teal-300" : "text-rose-300" },
           mode === "mese"
             ? { l: "Media giornaliera", v: eur(mediaGiorn || 0), tone: "text-indigo-300" }
-            : { l: "Patrimonio a fine periodo", v: eur0(patAt(periodEndIso)), tone: "text-indigo-300" },
+            : { l: "Patrimonio a fine periodo", v: eur(patAt(periodEndIso)), tone: "text-indigo-300" },
         ].map((s, i) => (
           <Card key={s.l} className="p-4" delay={i * 50}><p className="text-xs text-slate-400">{s.l}</p><p className={`font-display text-xl mt-1 tabular-nums ${s.tone}`}>{s.v}</p></Card>
         ))}
@@ -7510,8 +7512,8 @@ function Report({ txs, catById, monthStats, patrimonio, data, update }) {
       {yoy && (
         <Card className="p-4 mb-5" hover={false} delay={150}>
           <p className="text-sm text-slate-300">
-            <span className="text-indigo-300">↔</span> Rispetto a <b className="text-white">{labelMk(yoy.prevMk).toLowerCase()}</b>: spese {yoy.dSpese >= 0 ? "aumentate" : "diminuite"} di <b className={yoy.dSpese >= 0 ? "text-rose-300" : "text-emerald-300"}>{eur0(Math.abs(yoy.dSpese))}</b>
-            {yoy.pctSpese != null && <span className="text-slate-500"> ({yoy.dSpese >= 0 ? "+" : "−"}{Math.abs(yoy.pctSpese).toFixed(0)}%)</span>}, entrate {yoy.dEntrate >= 0 ? "in crescita" : "in calo"} di <b className={yoy.dEntrate >= 0 ? "text-emerald-300" : "text-rose-300"}>{eur0(Math.abs(yoy.dEntrate))}</b>.
+            <span className="text-indigo-300">↔</span> Rispetto a <b className="text-white">{labelMk(yoy.prevMk).toLowerCase()}</b>: spese {yoy.dSpese >= 0 ? "aumentate" : "diminuite"} di <b className={yoy.dSpese >= 0 ? "text-rose-300" : "text-emerald-300"}>{eur(Math.abs(yoy.dSpese))}</b>
+            {yoy.pctSpese != null && <span className="text-slate-500"> ({yoy.dSpese >= 0 ? "+" : "−"}{Math.abs(yoy.pctSpese).toFixed(0)}%)</span>}, entrate {yoy.dEntrate >= 0 ? "in crescita" : "in calo"} di <b className={yoy.dEntrate >= 0 ? "text-emerald-300" : "text-rose-300"}>{eur(Math.abs(yoy.dEntrate))}</b>.
           </p>
         </Card>
       )}
@@ -7554,7 +7556,7 @@ function Report({ txs, catById, monthStats, patrimonio, data, update }) {
               {donut.map((d) => (
                 <div key={d.name} className="flex items-center justify-between gap-2 min-w-0">
                   <span className="flex items-center gap-1.5 text-slate-300 truncate"><span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.fill }} />{d.name}</span>
-                  <span className="text-slate-400 tabular-nums shrink-0">{eur0(d.value)}</span>
+                  <span className="text-slate-400 tabular-nums shrink-0">{eur(d.value)}</span>
                 </div>
               ))}
               {donut.length === 0 && <p className="text-slate-500 col-span-2">Nessuna spesa nel periodo.</p>}
@@ -7588,25 +7590,25 @@ function Report({ txs, catById, monthStats, patrimonio, data, update }) {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         {[
-          { l: `Entrate ${year}`, v: eur0(annual.totEntrate), tone: "text-emerald-300" },
-          { l: `Spese ${year}`, v: eur0(annual.totSpese), tone: "text-rose-300" },
-          { l: "Risparmio totale", v: eur0(annual.risparmioTot), tone: annual.risparmioTot >= 0 ? "text-teal-300" : "text-rose-300" },
-          { l: "Media spese / mese", v: eur0(annual.media), tone: "text-indigo-300" },
+          { l: `Entrate ${year}`, v: eur(annual.totEntrate), tone: "text-emerald-300" },
+          { l: `Spese ${year}`, v: eur(annual.totSpese), tone: "text-rose-300" },
+          { l: "Risparmio totale", v: eur(annual.risparmioTot), tone: annual.risparmioTot >= 0 ? "text-teal-300" : "text-rose-300" },
+          { l: "Media spese / mese", v: eur(annual.media), tone: "text-indigo-300" },
         ].map((s, i) => (
           <Card key={s.l} className="p-4" delay={i * 50}><p className="text-xs text-slate-400">{s.l}</p><p className={`font-display text-xl mt-1 tabular-nums ${s.tone}`}>{s.v}</p></Card>
         ))}
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-        <Card className="p-4" delay={80}><p className="text-xs text-slate-400">Mese più costoso</p><p className="text-white mt-1">{annual.maxSpesa ? `${annual.maxSpesa.mese} · ${eur0(annual.maxSpesa.Spese)}` : "—"}</p></Card>
-        <Card className="p-4" delay={130}><p className="text-xs text-slate-400">Miglior risparmio</p><p className="text-white mt-1">{annual.maxRisp ? `${annual.maxRisp.mese} · ${eur0(annual.maxRisp.Risparmio)}` : "—"}</p></Card>
-        <Card className="p-4" delay={180}><p className="text-xs text-slate-400">Categoria più costosa</p><p className="text-white mt-1 truncate">{annual.topSum ? `${catById[annual.topSum[0]]?.icona || ""} ${catById[annual.topSum[0]]?.nome || "?"} · ${eur0(annual.topSum[1])}` : "—"}</p></Card>
+        <Card className="p-4" delay={80}><p className="text-xs text-slate-400">Mese più costoso</p><p className="text-white mt-1">{annual.maxSpesa ? `${annual.maxSpesa.mese} · ${eur(annual.maxSpesa.Spese)}` : "—"}</p></Card>
+        <Card className="p-4" delay={130}><p className="text-xs text-slate-400">Miglior risparmio</p><p className="text-white mt-1">{annual.maxRisp ? `${annual.maxRisp.mese} · ${eur(annual.maxRisp.Risparmio)}` : "—"}</p></Card>
+        <Card className="p-4" delay={180}><p className="text-xs text-slate-400">Categoria più costosa</p><p className="text-white mt-1 truncate">{annual.topSum ? `${catById[annual.topSum[0]]?.icona || ""} ${catById[annual.topSum[0]]?.nome || "?"} · ${eur(annual.topSum[1])}` : "—"}</p></Card>
         <Card className="p-4" delay={230}><p className="text-xs text-slate-400">Categoria più usata</p><p className="text-white mt-1 truncate">{annual.topCount ? `${catById[annual.topCount[0]]?.icona || ""} ${catById[annual.topCount[0]]?.nome || "?"} · ${annual.topCount[1]} volte` : "—"}</p></Card>
       </div>
       <Card className="p-4 mb-5" hover={false} delay={260}>
         <div className="flex items-center gap-3">
           <span className="text-lg">{crescita >= 0 ? "📈" : "📉"}</span>
           <p className="text-sm text-slate-300">
-            Patrimonio {crescita >= 0 ? "cresciuto" : "diminuito"} di <b className={crescita >= 0 ? "text-emerald-300" : "text-rose-300"}>{eur0(Math.abs(crescita))}</b>
+            Patrimonio {crescita >= 0 ? "cresciuto" : "diminuito"} di <b className={crescita >= 0 ? "text-emerald-300" : "text-rose-300"}>{eur(Math.abs(crescita))}</b>
             {crescitaPct != null && <span className="text-slate-500"> ({crescita >= 0 ? "+" : "−"}{Math.abs(crescitaPct).toFixed(1)}%)</span>} rispetto a fine {year - 1}.
           </p>
         </div>
@@ -7680,10 +7682,10 @@ function Report({ txs, catById, monthStats, patrimonio, data, update }) {
                 return (
                   <tr key={r.m} className="hover:bg-white/[0.03] transition-colors">
                     <td className={`py-2 pr-3 ${r.futuro ? "text-slate-600" : "text-slate-200"}`}>{r.mese} {isMax && <span title="Mese più costoso">🔥</span>}{isBest && <span title="Miglior risparmio">🏆</span>}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-emerald-300/90">{r.Entrate ? eur0(r.Entrate) : "—"}</td>
-                    <td className={`py-2 pr-3 text-right tabular-nums ${isMax ? "text-rose-300 font-medium" : "text-slate-300"}`}>{r.Spese ? eur0(r.Spese) : "—"}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-slate-400">{r.Investimenti ? eur0(r.Investimenti) : "—"}</td>
-                    <td className={`py-2 text-right tabular-nums ${isBest ? "text-teal-300 font-medium" : r.Risparmio < 0 ? "text-rose-300/90" : "text-slate-300"}`}>{r.Entrate || r.Spese ? eur0(r.Risparmio) : "—"}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-emerald-300/90">{r.Entrate ? eur(r.Entrate) : "—"}</td>
+                    <td className={`py-2 pr-3 text-right tabular-nums ${isMax ? "text-rose-300 font-medium" : "text-slate-300"}`}>{r.Spese ? eur(r.Spese) : "—"}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-slate-400">{r.Investimenti ? eur(r.Investimenti) : "—"}</td>
+                    <td className={`py-2 text-right tabular-nums ${isBest ? "text-teal-300 font-medium" : r.Risparmio < 0 ? "text-rose-300/90" : "text-slate-300"}`}>{r.Entrate || r.Spese ? eur(r.Risparmio) : "—"}</td>
                   </tr>
                 );
               })}
@@ -7713,7 +7715,7 @@ function Obiettivi({ data, update, notify, setConfirmDlg }) {
             <Card key={g.id} className="p-5" delay={60 + i * 70}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-white">{g.nome}</p>
-                <span className="text-xs text-slate-400 tabular-nums">{eur0(g.salvato)} / {eur0(g.target)} · {Math.round(pct)}%</span>
+                <span className="text-xs text-slate-400 tabular-nums">{eur(g.salvato)} / {eur(g.target)} · {Math.round(pct)}%</span>
               </div>
               <div className="h-2.5 rounded-full bg-white/5 overflow-hidden mb-3">
                 <div className="h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden" style={{ width: `${pct}%`, background: `linear-gradient(90deg,${g.colore},#A5B4FC)` }}>
@@ -7721,7 +7723,7 @@ function Obiettivi({ data, update, notify, setConfirmDlg }) {
                 </div>
               </div>
               <div className="flex gap-2">
-                {[50, 100, 250].map((a) => <BtnGhost key={a} onClick={() => { addTo(g.id, a); notify(`+${eur0(a)} verso ${g.nome}`); }} className="!px-3 !py-1.5 !text-xs">+{a}€</BtnGhost>)}
+                {[50, 100, 250].map((a) => <BtnGhost key={a} onClick={() => { addTo(g.id, a); notify(`+${eur(a)} verso ${g.nome}`); }} className="!px-3 !py-1.5 !text-xs">+{a}€</BtnGhost>)}
                 <button onClick={() => setConfirmDlg({ msg: `Eliminare l'obiettivo "${g.nome}"?`, onOk: () => update((d) => { d.goals = d.goals.filter((x) => x.id !== g.id); return d; }) })} className="ml-auto text-xs text-slate-600 hover:text-rose-300 transition-colors">Elimina</button>
               </div>
             </Card>
