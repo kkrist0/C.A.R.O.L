@@ -21,6 +21,7 @@
 <script src="https://unpkg.com/globe.gl@2.46.1/dist/globe.gl.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>html,body{margin:0;background:#0A0C12;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none; overflow-x: hidden; width: 100%; max-width: 100vw;}
 body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 input,select,textarea{font-size:16px!important}
@@ -495,10 +496,48 @@ class GoogleSheetsProvider extends DataProvider {
   }
 }
 
+/** Supabase: lettura e scrittura complete, con storage JSON. */
+class SupabaseProvider extends DataProvider {
+  constructor(cfg) { 
+    super(); 
+    this.client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey); 
+  }
+  
+  get id() { return "supabase"; }
+  
+  async ping() { 
+    const { error } = await this.client.from('app_state').select('id').limit(1);
+    if (error) throw new SyncError("Supabase non raggiungibile", { hint: error.message });
+    return { ok: true, title: "Supabase Connesso" }; 
+  }
+  
+  async read() {
+    const { data, error } = await this.client.from('app_state').select('data').eq('id', 'carol_main').single();
+    if (error && error.code !== 'PGRST116') throw new SyncError("Errore lettura Supabase", { hint: error.message });
+    return data ? data.data : null;
+  }
+  
+  async write(state) {
+    const { error } = await this.client.from('app_state').upsert({ id: 'carol_main', data: state });
+    if (error) throw new SyncError("Errore scrittura Supabase", { hint: error.message });
+    return new Date().toISOString();
+  }
+}
+
 /** Repository: unico punto di accesso ai dati per tutta l'app. */
 class FinanceRepository {
   constructor() { this.local = new LocalProvider(); this.remote = null; }
-  setRemote(cfg) { this.remote = cfg?.enabled && cfg?.url ? new GoogleSheetsProvider(cfg) : null; }
+  setRemote(cfg) { 
+    if (!cfg?.enabled) {
+      this.remote = null;
+    } else if (cfg.provider === "supabase" && cfg.supabaseUrl && cfg.supabaseKey) {
+      this.remote = new SupabaseProvider(cfg);
+    } else if ((!cfg.provider || cfg.provider === "sheets") && cfg.url) {
+      this.remote = new GoogleSheetsProvider(cfg);
+    } else {
+      this.remote = null;
+    }
+  }
   get hasRemote() { return !!this.remote; }
   loadLocal() { return this.local.read(); }
   saveLocal(state) { return this.local.write(state); }
@@ -524,7 +563,16 @@ function uniscePreservando(locale, remoto) {
 const syncableState = (d) => ({ transactions: d.transactions, accounts: d.accounts, accountTypes: d.accountTypes, categories: d.categories, budgets: d.budgets, goals: d.goals, groups: d.groups, trips: d.trips || [], tripExpenses: d.tripExpenses || [], wishlist: d.wishlist || [], jobs: d.jobs || [], salaryEvents: d.salaryEvents || [], assets: d.assets || [], trades: d.trades || [], portfolioSnapshots: d.portfolioSnapshots || [], payslips: d.payslips || [], tfrEntries: d.tfrEntries || [], documenti: d.documenti || [], quotes: d.quotes || {} });
 
 const SYNC_CFG_KEY = "C.A.R.O.L.:sync";
-const DEFAULT_SYNC_CFG = { enabled: false, url: "", token: "", autoPush: true, lastSync: null };
+const DEFAULT_SYNC_CFG = { 
+  enabled: false, 
+  provider: "sheets", // "sheets" o "supabase"
+  url: "", 
+  token: "", 
+  supabaseUrl: "", 
+  supabaseKey: "", 
+  autoPush: true, 
+  lastSync: null 
+};
 
 /** Codice Apps Script da incollare (mostrato in Impostazioni). */
 const APPS_SCRIPT_CODE = `// ===== C.A.R.O.L. · backend Google Sheets =====
@@ -8124,6 +8172,7 @@ function SheetsSettings({ syncCfg, saveSyncCfg, syncState, pushNow, pullNow, pen
 function Impostazioni({ data, update, backups, manualBackup, restoreBackup, exportJSON, exportCSV, exportXLSX, importJSON, restoreTx, hardDelete, catById, notify, setConfirmDlg, setData, syncCfg, saveSyncCfg, syncState, pushNow, pullNow, pendingPush }) {
   const trash = data.transactions.filter((t) => t.deletedAt);
   const fileRef = useRef(null);
+
   return (
     <div className="max-w-3xl mx-auto">
       <header className="mb-5" style={{ animation: "fadeUp .5s both" }}>
@@ -8131,7 +8180,60 @@ function Impostazioni({ data, update, backups, manualBackup, restoreBackup, expo
         <h1 className="font-display text-xl sm:text-2xl text-white mt-1">Dati, backup e sicurezza</h1>
       </header>
 
-      <SheetsSettings {...{ syncCfg, saveSyncCfg, syncState, pushNow, pullNow, pendingPush, data, notify }} />
+      {/* --- NUOVA SEZIONE SINCRONIZZAZIONE --- */}
+      <Card className="p-5 mb-4" hover={false} delay={30}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-display text-white">Sincronizzazione Cloud</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Salva i dati su Google Sheets o Supabase.</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={syncCfg.enabled} onChange={(e) => saveSyncCfg({ ...syncCfg, enabled: e.target.checked })} />
+            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-400"></div>
+          </label>
+        </div>
+
+        {syncCfg.enabled && (
+          <div className="space-y-3 mt-4 pt-4 border-t border-white/5" style={{ animation: "fadeIn .3s both" }}>
+            <div>
+              <Label>Database Remoto</Label>
+              <Select value={syncCfg.provider || "sheets"} onChange={(e) => saveSyncCfg({ ...syncCfg, provider: e.target.value })}>
+                <option value="sheets">Google Sheets (Apps Script)</option>
+                <option value="supabase">Supabase (PostgreSQL)</option>
+              </Select>
+            </div>
+
+            {(!syncCfg.provider || syncCfg.provider === "sheets") ? (
+              <div className="grid sm:grid-cols-2 gap-3" style={{ animation: "fadeIn .2s both" }}>
+                <div><Label>URL App Web (Google)</Label><Input value={syncCfg.url || ""} onChange={(e) => saveSyncCfg({ ...syncCfg, url: e.target.value })} placeholder="https://script.google.com/..." /></div>
+                <div><Label>Token Sicurezza</Label><Input type="password" value={syncCfg.token || ""} onChange={(e) => saveSyncCfg({ ...syncCfg, token: e.target.value })} placeholder="Il tuo token segreto" /></div>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-3" style={{ animation: "fadeIn .2s both" }}>
+                <div><Label>Supabase Project URL</Label><Input value={syncCfg.supabaseUrl || ""} onChange={(e) => saveSyncCfg({ ...syncCfg, supabaseUrl: e.target.value })} placeholder="https://xyz.supabase.co" /></div>
+                <div><Label>Anon Public Key</Label><Input type="password" value={syncCfg.supabaseKey || ""} onChange={(e) => saveSyncCfg({ ...syncCfg, supabaseKey: e.target.value })} placeholder="eyJh..." /></div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4 p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <span className={`w-2 h-2 rounded-full ${syncState === 'error' ? 'bg-rose-400' : pendingPush ? 'bg-amber-400' : syncState === 'ok' ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
+                {syncState === "pulling" ? "Lettura..." : syncState === "pushing" ? "Scrittura..." : syncState === "error" ? "Errore di sync" : pendingPush ? "In attesa..." : syncCfg.lastSync ? `Sincronizzato (${new Date(syncCfg.lastSync).toLocaleDateString("it-IT")} ${new Date(syncCfg.lastSync).toLocaleTimeString("it-IT", {hour: '2-digit', minute:'2-digit'})})` : "Mai sincronizzato"}
+              </div>
+              <div className="flex gap-2">
+                <BtnGhost onClick={pullNow} disabled={syncState === "pulling" || syncState === "pushing"} className="!py-1.5 !text-xs">⬇ Ricevi</BtnGhost>
+                <BtnPrimary onClick={() => pushNow(data, false)} disabled={syncState === "pulling" || syncState === "pushing"} className="!py-1.5 !text-xs">⬆ Invia</BtnPrimary>
+              </div>
+            </div>
+            
+            <label className="flex items-center gap-2 cursor-pointer mt-2 w-max">
+              <input type="checkbox" className="rounded border-white/10 bg-white/5 text-indigo-400 focus:ring-indigo-400/30" checked={syncCfg.autoPush !== false} onChange={(e) => saveSyncCfg({ ...syncCfg, autoPush: e.target.checked })} />
+              <span className="text-xs text-slate-400">Invia automaticamente le modifiche al database (Auto-Push)</span>
+            </label>
+          </div>
+        )}
+      </Card>
+      {/* --- FINE SEZIONE SINCRONIZZAZIONE --- */}
 
       <DriveSettings data={data} update={update} notify={notify} />
       <QuotesSettings data={data} update={update} notify={notify} />
