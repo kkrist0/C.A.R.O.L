@@ -1317,7 +1317,7 @@ function App() {
     return (
       <div className="min-h-screen bg-[#0A0C12] p-4 pt-[max(1rem,env(safe-area-inset-top))] md:p-8">
         <StyleTag />
-        <div className="max-w-6xl mx-auto md:pl-56">
+        <div className="w-full max-w-[2400px] mx-auto md:pl-56">
           <div className="skeleton h-4 w-24 rounded-md mb-2" />
           <div className="skeleton h-8 w-72 rounded-lg mb-6" />
           <div className="skeleton h-64 w-full rounded-2xl mb-5" />
@@ -1805,7 +1805,7 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
   ];
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Dashboard</p>
@@ -2097,7 +2097,7 @@ function Movimenti({ txs, catById, accById, data, setTxModal, softDelete }) {
   const visible = filtered.slice(0, limit);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5 flex items-end justify-between gap-3 flex-wrap" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Movimenti</p>
@@ -3400,7 +3400,7 @@ function ViaggiPage({ data, update, notify, setConfirmDlg, catById }) {
   const countryInfo = country ? st.perPaese[country] : null;
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5 flex items-end justify-between gap-3 flex-wrap" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Viaggi</p>
@@ -4622,7 +4622,7 @@ function CarrieraPage({ data, update, notify, setConfirmDlg }) {
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5 flex items-end justify-between gap-3 flex-wrap" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Carriera</p>
@@ -5371,7 +5371,7 @@ function ArchivioPage({ data, update, notify, setConfirmDlg }) {
   }, [documenti]);
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5 flex items-end justify-between gap-3 flex-wrap" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Archivio</p>
@@ -6515,7 +6515,7 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
   const plTone = pf.pl >= 0 ? "text-emerald-300" : "text-rose-300";
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5 flex items-end justify-between gap-3 flex-wrap" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Investimenti</p>
@@ -7266,7 +7266,7 @@ function CategoriePage({ data, update, notify, setConfirmDlg, txs, setCatEditor 
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5 flex items-end justify-between" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Categorie</p>
@@ -7435,7 +7435,7 @@ function BudgetPage({ data, update, cur, catById, notify }) {
   const spendCats = data.categories.filter((c) => !getCategoryGroups(c).includes("Entrate"));
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5" style={{ animation: "fadeUp .5s both" }}>
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Budget mensili</p>
         <h1 className="font-display text-xl sm:text-2xl text-white mt-1">Limiti sotto controllo</h1>
@@ -7494,7 +7494,7 @@ function Conti({ data, balances, update, onTransfer, notify, setConfirmDlg, txsA
   });
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5 flex items-end justify-between gap-3" style={{ animation: "fadeUp .5s both" }}>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Conti</p>
@@ -7741,7 +7741,7 @@ function Report({ txs, catById, monthStats, patrimonio, data, update }) {
   const crescitaPct = annual.patEndPrev !== 0 ? (crescita / Math.abs(annual.patEndPrev)) * 100 : null;
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5" style={{ animation: "fadeUp .5s both" }}>
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Report</p>
         <h1 className="font-display text-xl sm:text-2xl text-white mt-1">Analisi e tendenze</h1>
@@ -7983,7 +7983,7 @@ function Obiettivi({ data, update, notify, setConfirmDlg }) {
   const [target, setTarget] = useState("");
   const addTo = (id, amt) => update((d) => { const g = d.goals.find((x) => x.id === id); if (g) g.salvato = Math.max(0, g.salvato + amt); return d; });
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5" style={{ animation: "fadeUp .5s both" }}>
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Obiettivi di risparmio</p>
         <h1 className="font-display text-xl sm:text-2xl text-white mt-1">Ogni euro ha una destinazione</h1>
@@ -8284,7 +8284,7 @@ function Impostazioni({ data, update, backups, manualBackup, restoreBackup, expo
   const fileRef = useRef(null);
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full max-w-[2400px] mx-auto">
       <header className="mb-5" style={{ animation: "fadeUp .5s both" }}>
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Impostazioni</p>
         <h1 className="font-display text-xl sm:text-2xl text-white mt-1">Dati, backup e sicurezza</h1>
@@ -8496,11 +8496,9 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
   const isEdit = !!tx?.id;
   const [form, setForm] = useState(null);
 
-  // 1. DEFINIAMO LE LISTE IN ALTO: d'ora in poi modifichi solo queste!
   const metodiSpesa = ["Carta di Debito", "Bonifico", "Contanti", "SDD", "Carta di Credito", "Wallet Digitale", "Carta Prepagata", "Altro"];
   const metodiEntrata = ["Bonifico", "Accredito", "Contanti", "Altro"];
   
-  // Funzione di supporto per generare la descrizione automatica
   const getTransferNote = (contoId, contoDestId) => {
     const nomeOrigine = data.accounts.find((a) => a.id === contoId)?.nome || "";
     const nomeDestinazione = data.accounts.find((a) => a.id === contoDestId)?.nome || "";
@@ -8518,7 +8516,6 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
         initialNote = getTransferNote(initialConto, initialContoDest);
       }
 
-      // 2. PESCHIAMO SEMPRE IL PRIMO VALORE DINAMICAMENTE!
       let defaultMetodo = initialTipo === "entrata" ? metodiEntrata[0] : metodiSpesa[0];
       if (initialTipo === "trasferimento") defaultMetodo = "Trasferimento";
 
@@ -8548,7 +8545,6 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
   const showGroupSelect = !isTr && form.tipo !== "entrata" && spendGroups.length > 1;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  // 3. (Rimosso da qui perché l'abbiamo spostato in alto)
   let metodiAttuali = form.tipo === "entrata" ? [...metodiEntrata] : [...metodiSpesa];
   
   if (form.metodo && form.metodo !== "Trasferimento" && !metodiAttuali.includes(form.metodo)) {
@@ -8610,7 +8606,7 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
           <Input placeholder="Descrizione spesa…" value={form.note} onChange={(e) => set("note", e.target.value)} autoFocus />
         </div>
         
-        {/* IMPORTO E DATA AFFIANCATI */}
+        {/* IMPORTO E DATA */}
         <div className="flex w-full gap-3">
           <div className="flex-1 min-w-0">
             <Label>Importo</Label>
@@ -8637,7 +8633,7 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
 
         {isTr ? (
           <>
-            {/* TRASFERIMENTI: CONTI AFFIANCATI */}
+            {/* TRASFERIMENTI: CONTI */}
             <div className="grid grid-cols-2 gap-3">
               <div className="min-w-0">
                 <Label>Dal conto</Label>
@@ -8648,7 +8644,6 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
                     setForm((f) => {
                       let nuovoContoDest = f.contoDest;
                       
-                      // Controllo anti-conflitto
                       if (nuovoConto === f.contoDest) {
                         nuovoContoDest = data.accounts.find((a) => a.id !== nuovoConto)?.id || "";
                       }
