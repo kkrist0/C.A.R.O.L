@@ -8495,6 +8495,10 @@ function CategoryPicker({ data, value, tipoEntrata, onSelect, onEditCat, onCreat
 function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
   const isEdit = !!tx?.id;
   const [form, setForm] = useState(null);
+
+  // 1. DEFINIAMO LE LISTE IN ALTO: d'ora in poi modifichi solo queste!
+  const metodiSpesa = ["Carta di Debito", "Bonifico", "Contanti", "SDD", "Carta di Credito", "Wallet Digitale", "Carta Prepagata", "Altro"];
+  const metodiEntrata = ["Bonifico", "Accredito", "Contanti", "Altro"];
   
   // Funzione di supporto per generare la descrizione automatica
   const getTransferNote = (contoId, contoDestId) => {
@@ -8509,11 +8513,14 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
       const initialConto = tx?.conto || data.accounts[0]?.id || "";
       const initialContoDest = tx?.contoDest || data.accounts[1]?.id || "";
       
-      // Se apro un NUOVO movimento impostato già come trasferimento, pre-compilo la nota
       let initialNote = tx?.note || "";
       if (!tx?.id && initialTipo === "trasferimento") {
         initialNote = getTransferNote(initialConto, initialContoDest);
       }
+
+      // 2. PESCHIAMO SEMPRE IL PRIMO VALORE DINAMICAMENTE!
+      let defaultMetodo = initialTipo === "entrata" ? metodiEntrata[0] : metodiSpesa[0];
+      if (initialTipo === "trasferimento") defaultMetodo = "Trasferimento";
 
       setForm({ 
         tipo: initialTipo, 
@@ -8524,7 +8531,7 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
         sottocategoria: tx?.sottocategoria || "", 
         conto: initialConto, 
         contoDest: initialContoDest, 
-        metodo: tx?.metodo || "Carta", 
+        metodo: tx?.metodo || defaultMetodo, 
         note: initialNote, 
         tags: (tx?.tags || []).join(", "), 
         id: tx?.id 
@@ -8541,8 +8548,7 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
   const showGroupSelect = !isTr && form.tipo !== "entrata" && spendGroups.length > 1;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const metodiSpesa = ["Carta di Debito", "Bonifico", "Contanti", "SDD", "Carta di Credito", "Wallet Digitale", "Carta Prepagata", "Altro"];
-  const metodiEntrata = ["Bonifico", "Accredito", "Contanti", "Altro"];
+  // 3. (Rimosso da qui perché l'abbiamo spostato in alto)
   let metodiAttuali = form.tipo === "entrata" ? [...metodiEntrata] : [...metodiSpesa];
   
   if (form.metodo && form.metodo !== "Trasferimento" && !metodiAttuali.includes(form.metodo)) {
@@ -8572,13 +8578,12 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
               const newMetodi = t.v === "entrata" ? metodiEntrata : metodiSpesa;
               setForm((f) => {
                 let newNote = f.note;
-                // Generazione automatica / pulizia della nota in base alla tab selezionata
                 if (t.v === "trasferimento") {
                   if (!newNote || newNote.startsWith("Trasferimento:")) {
                     newNote = getTransferNote(f.conto, f.contoDest);
                   }
                 } else if (f.tipo === "trasferimento" && newNote.startsWith("Trasferimento:")) {
-                  newNote = ""; // Pulisco se torno a spesa o entrata
+                  newNote = ""; 
                 }
 
                 return { 
@@ -8643,8 +8648,7 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
                     setForm((f) => {
                       let nuovoContoDest = f.contoDest;
                       
-                      // Controllo anti-conflitto: se il nuovo conto origine è uguale a quello di destinazione,
-                      // spostiamo automaticamente la destinazione sul primo conto disponibile.
+                      // Controllo anti-conflitto
                       if (nuovoConto === f.contoDest) {
                         nuovoContoDest = data.accounts.find((a) => a.id !== nuovoConto)?.id || "";
                       }
@@ -8742,7 +8746,7 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
           </>
         )}
       </div>
-      {/* SEZIONE PULSANTI MODIFICATA */}
+      {/* SEZIONE PULSANTI */}
       <div className="flex flex-row justify-between items-center mt-6 w-full gap-2">
         <div className="shrink-0">
           {/* Mostra Elimina solo se stiamo modificando un movimento esistente */}
@@ -8757,8 +8761,6 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
             </button>
           )}
         </div>
-        
-        {/* Usiamo flex-row forzato e accorciamo il testo per farci stare tutto su mobile */}
         <div className="flex flex-row items-center gap-2 sm:gap-3 shrink-0">
           <BtnGhost onClick={onClose}>Annulla</BtnGhost>
           <BtnPrimary onClick={submit}>{isEdit ? "Salva" : isTr ? "Trasferisci" : "Aggiungi"}</BtnPrimary>
