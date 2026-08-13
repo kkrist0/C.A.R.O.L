@@ -8541,8 +8541,8 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
   const showGroupSelect = !isTr && form.tipo !== "entrata" && spendGroups.length > 1;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const metodiSpesa = ["Carta", "Contanti", "Bonifico", "Addebito", "Altro"];
-  const metodiEntrata = ["Bonifico", "Contanti", "Assegno", "Altro"];
+  const metodiSpesa = ["Carta di Debito", "Bonifico", "Contanti", "SDD", "Carta di Credito", "Wallet Digitale", "Carta Prepagata", "Altro"];
+  const metodiEntrata = ["Bonifico", "Accredito", "Contanti", "Altro"];
   let metodiAttuali = form.tipo === "entrata" ? [...metodiEntrata] : [...metodiSpesa];
   
   if (form.metodo && form.metodo !== "Trasferimento" && !metodiAttuali.includes(form.metodo)) {
