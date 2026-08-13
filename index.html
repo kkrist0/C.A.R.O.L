@@ -6301,9 +6301,50 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
 
   useEffect(() => {
     // quando si apre la pagina investimenti, avvia anche l'aggiornamento delle quotazioni
-    // per il portafoglio (aggiornaTutti) e pianifica di lanciare il carica() del Mercato quando disponibile
     aggiornaTutti();
   }, []);
+
+  // =========================================================================
+  // NUOVO: AUTOSALVATAGGIO SNAPSHOT A FINE MESE (DOPO LE 18:00)
+  // =========================================================================
+  useEffect(() => {
+    // Non salviamo se stiamo ancora scaricando i prezzi o se il portafoglio è vuoto
+    if (aggiornando || !pf || pf.valore <= 0) return;
+
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    
+    // Calcoliamo qual è l'ultimo mese "chiuso" dal punto di vista dei mercati
+    let closedDate = new Date(now);
+    if (!(now.getDate() === lastDay && now.getHours() >= 18)) {
+      // Se NON siamo all'ultimo giorno del mese dopo le 18:00, 
+      // l'ultimo mese chiuso è matematicamente il mese precedente.
+      closedDate.setDate(0); 
+    }
+    
+    const mk = monthKey(closedDate.toISOString()); // es. "2026-08"
+    
+    // Controlliamo se esiste già uno snapshot per questo mese
+    const hasSnapshot = (data.portfolioSnapshots || []).some((s) => s.mese === mk);
+    
+    if (!hasSnapshot) {
+      update((d) => {
+        if (!d.portfolioSnapshots) d.portfolioSnapshots = [];
+        // Doppio controllo per evitare doppi salvataggi istantanei
+        if (!d.portfolioSnapshots.some((s) => s.mese === mk)) {
+          d.portfolioSnapshots.push({
+            mese: mk,
+            valore: pf.valore, // Usa l'ultimo valore calcolato (fresco di API)
+            note: "Autosalvataggio chiusura mercati"
+          });
+          d.portfolioSnapshots.sort((a, b) => a.mese.localeCompare(b.mese));
+        }
+        return d;
+      });
+      // Opzionale: mostra una piccola notifica all'utente
+      // notify(`Snapshot automatico salvato per ${labelMk(mk)}`);
+    }
+  }, [pf.valore, aggiornando, data.portfolioSnapshots, update]);
 
   const saveAsset = (a) => {
     update((d) => { if (!d.assets) d.assets = []; const i = d.assets.findIndex((x) => x.id === a.id); if (i >= 0) d.assets[i] = a; else d.assets.push(a); return d; });
@@ -6336,14 +6377,26 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
     });
     notify(`Snapshot salvato per ${labelMk(mk)}: ${eur(valore)}`);
   };
+
   const handleTimelineClick = (state) => {
     const payload = state?.activePayload || (Array.isArray(state) ? state[0]?.payload : null);
     const active = Array.isArray(payload) ? payload[0] : payload;
-    const mk = active?.payload?.mese;
+    const mk = active?.payload?.mese; // es. "2026-08"
     const valore = active?.payload?.Valore;
     if (!mk) return;
+
     const snapshot = (data.portfolioSnapshots || []).find((s) => s.mese === mk);
+    
+    const nowIso = new Date().toISOString();
+    const currentMk = monthKey(nowIso); // Il mese in cui ci troviamo ora
+    
+    if (mk === currentMk && !snapshot) {
+      notify("Lo snapshot per questo mese verrà creato in automatico l'ultimo giorno dopo le 18:00.");
+      return; 
+    }
+
     setSnapshotMonth(mk);
+    
     if (snapshot) {
       setSnapshotValue(String(snapshot.valore).replace(".", ","));
       setSnapshotNote(snapshot.note || "");
@@ -6354,8 +6407,10 @@ function InvestimentiPage({ data, update, notify, setConfirmDlg }) {
       setSnapshotValue("");
       setSnapshotNote("");
     }
+    
     setSnapshotModalOpen(true);
   };
+
   const saveManualSnapshot = () => {
     const valore = Number(String(snapshotValue || "").replace(/,/g, "."));
     if (!snapshotMonth || !Number.isFinite(valore) || valore <= 0) {
