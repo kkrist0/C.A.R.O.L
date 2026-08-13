@@ -8434,24 +8434,36 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
       </div>
       {isTr && <p className="text-[11px] text-slate-500 mb-3 -mt-1">Sposta denaro tra i tuoi conti: non conta come spesa né come entrata, e il patrimonio totale resta invariato.</p>}
       <div className="space-y-3">
-        <div><Label>Descrizione</Label><Input placeholder="Descrizione spesa…" value={form.note} onChange={(e) => set("note", e.target.value)} autoFocus /></div>
+        {/* DESCRIZIONE */}
+        <div>
+          <Label>Descrizione</Label>
+          <Input placeholder="Descrizione spesa…" value={form.note} onChange={(e) => set("note", e.target.value)} autoFocus />
+        </div>
         
-        {/* IMPORTO E DATA AFFIANCATI (Flex 40-60 per risolvere il bug di iOS) */}
-        <div className="flex gap-3">
-          <div className="w-[40%] min-w-0">
+        {/* IMPORTO E TAG AFFIANCATI */}
+        <div className={`grid gap-3 ${isTr ? "grid-cols-1" : "grid-cols-2"}`}>
+          <div className="min-w-0">
             <Label>Importo</Label>
-            <Input type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.importo} onChange={(e) => set("importo", e.target.value)} />
+            <Input type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.importo} onChange={(e) => set("importo", e.target.value)}/>
           </div>
-          <div className="w-[60%] min-w-0">
-            <Label>Data</Label>
-            <Input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} style={{ minWidth: 0, paddingLeft: "8px", paddingRight: "8px" }} />
-          </div>
+          {!isTr && (
+            <div className="min-w-0">
+              <Label>Tag</Label>
+              <Input placeholder="es. vacanza..." value={form.tags} onChange={(e) => set("tags", e.target.value)} />
+            </div>
+          )}
+        </div>
+        
+        {/* DATA (Riga singola: risolve il bug di iOS) */}
+        <div>
+          <Label>Data</Label>
+          <Input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} />
         </div>
         
         {isTr ? (
           <>
-            {/* GRIGLIA ADATTIVA PER TRASFERIMENTI */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* TRASFERIMENTI: CONTI AFFIANCATI */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="min-w-0"><Label>Dal conto</Label><Select value={form.conto} onChange={(e) => set("conto", e.target.value)}>{data.accounts.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</Select></div>
               <div className="min-w-0"><Label>Al conto</Label><Select value={form.contoDest} onChange={(e) => set("contoDest", e.target.value)}>{data.accounts.filter((a) => a.id !== form.conto).map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</Select></div>
             </div>
@@ -8464,8 +8476,9 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
               <div className="min-w-0"><Label>Metodo</Label><Select value={form.metodo} onChange={(e) => set("metodo", e.target.value)}>{["Carta", "Contanti", "Bonifico", "Addebito", "Altro"].map((m) => <option key={m}>{m}</option>)}</Select></div>
             </div>
             
-            {/* SELETTORE CATEGORIA NATIVO */}
-            <div><Label>Categoria</Label>
+            {/* CATEGORIA */}
+            <div>
+              <Label>Categoria</Label>
               <Select 
                 value={form.categoria} 
                 onChange={(e) => {
@@ -8492,7 +8505,8 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
             </div>
 
             {showGroupSelect && (
-              <div style={{ animation: "fadeUp .3s both" }}><Label>Gruppo di spesa</Label>
+              <div style={{ animation: "fadeUp .3s both" }}>
+                <Label>Gruppo di spesa</Label>
                 <Select value={form.gruppo || spendGroups[0]} onChange={(e) => set("gruppo", e.target.value)}>
                   {spendGroups.map((g) => <option key={g} value={g}>{g}</option>)}
                 </Select>
@@ -8500,19 +8514,14 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
             )}
             
             {selCat?.sottocategorie?.length > 0 && (
-              <div style={{ animation: "fadeUp .3s both" }}><Label>Sottocategoria</Label>
+              <div style={{ animation: "fadeUp .3s both" }}>
+                <Label>Sottocategoria</Label>
                 <Select value={form.sottocategoria} onChange={(e) => set("sottocategoria", e.target.value)}>
                   <option value="">Nessuna</option>
                   {selCat.sottocategorie.map((s) => <option key={s} value={s}>{s}</option>)}
                 </Select>
               </div>
             )}
-            
-            {/* TAG A TUTTA LARGHEZZA */}
-            <div>
-              <Label>Tag</Label>
-              <Input placeholder="es. vacanza, lavoro (separati da virgola)" value={form.tags} onChange={(e) => set("tags", e.target.value)} />
-            </div>
           </>
         )}
       </div>
