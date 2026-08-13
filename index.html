@@ -8399,8 +8399,40 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
   const isEdit = !!tx?.id;
   const [form, setForm] = useState(null);
   
+  // Funzione di supporto per generare la descrizione automatica
+  const getTransferNote = (contoId, contoDestId) => {
+    const nomeOrigine = data.accounts.find((a) => a.id === contoId)?.nome || "";
+    const nomeDestinazione = data.accounts.find((a) => a.id === contoDestId)?.nome || "";
+    return `Trasferimento: ${nomeOrigine} ➔ ${nomeDestinazione}`;
+  };
+
   useEffect(() => {
-    if (open) setForm({ tipo: tx?.tipo || "spesa", importo: tx?.importo || "", data: tx?.data || todayISO(), categoria: tx?.categoria || "", gruppo: tx?.gruppo || "", sottocategoria: tx?.sottocategoria || "", conto: tx?.conto || data.accounts[0]?.id || "", contoDest: tx?.contoDest || data.accounts[1]?.id || "", metodo: tx?.metodo || "Carta", note: tx?.note || "", tags: (tx?.tags || []).join(", "), id: tx?.id });
+    if (open) {
+      const initialTipo = tx?.tipo || "spesa";
+      const initialConto = tx?.conto || data.accounts[0]?.id || "";
+      const initialContoDest = tx?.contoDest || data.accounts[1]?.id || "";
+      
+      // Se apro un NUOVO movimento impostato già come trasferimento, pre-compilo la nota
+      let initialNote = tx?.note || "";
+      if (!tx?.id && initialTipo === "trasferimento") {
+        initialNote = getTransferNote(initialConto, initialContoDest);
+      }
+
+      setForm({ 
+        tipo: initialTipo, 
+        importo: tx?.importo || "", 
+        data: tx?.data || todayISO(), 
+        categoria: tx?.categoria || "", 
+        gruppo: tx?.gruppo || "", 
+        sottocategoria: tx?.sottocategoria || "", 
+        conto: initialConto, 
+        contoDest: initialContoDest, 
+        metodo: tx?.metodo || "Carta", 
+        note: initialNote, 
+        tags: (tx?.tags || []).join(", "), 
+        id: tx?.id 
+      });
+    }
   }, [open, tx, data]);
   
   if (!open || !form) return null;
@@ -8411,6 +8443,14 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
   const spendGroups = catGroups.filter((g) => g !== "Entrate");
   const showGroupSelect = !isTr && form.tipo !== "entrata" && spendGroups.length > 1;
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const metodiSpesa = ["Carta", "Contanti", "Bonifico", "Addebito", "Altro"];
+  const metodiEntrata = ["Bonifico", "Contanti", "Assegno", "Altro"];
+  let metodiAttuali = form.tipo === "entrata" ? [...metodiEntrata] : [...metodiSpesa];
+  
+  if (form.metodo && form.metodo !== "Trasferimento" && !metodiAttuali.includes(form.metodo)) {
+    metodiAttuali.push(form.metodo);
+  }
 
   const submit = () => {
     const importo = Number(form.importo);
@@ -8429,7 +8469,35 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
     <Modal open={open} onClose={onClose} title={isEdit ? "Modifica movimento" : "Nuovo movimento"}>
       <div className="flex gap-1 bg-white/5 rounded-xl p-1 mb-4">
         {[{ v: "spesa", l: "Spesa" }, { v: "entrata", l: "Entrata" }, { v: "trasferimento", l: "Trasferimento" }].map((t) => (
-          <button key={t.v} onClick={() => setForm((f) => ({ ...f, tipo: t.v, categoria: t.v === f.tipo ? f.categoria : "", sottocategoria: "" }))} className={`flex-1 py-1.5 rounded-lg text-sm transition-all ${form.tipo === t.v ? "bg-white/15 text-white" : "text-slate-400"}`}>{t.l}</button>
+          <button 
+            key={t.v} 
+            onClick={() => {
+              const newMetodi = t.v === "entrata" ? metodiEntrata : metodiSpesa;
+              setForm((f) => {
+                let newNote = f.note;
+                // Generazione automatica / pulizia della nota in base alla tab selezionata
+                if (t.v === "trasferimento") {
+                  if (!newNote || newNote.startsWith("Trasferimento:")) {
+                    newNote = getTransferNote(f.conto, f.contoDest);
+                  }
+                } else if (f.tipo === "trasferimento" && newNote.startsWith("Trasferimento:")) {
+                  newNote = ""; // Pulisco se torno a spesa o entrata
+                }
+
+                return { 
+                  ...f, 
+                  tipo: t.v, 
+                  categoria: t.v === f.tipo ? f.categoria : "", 
+                  sottocategoria: "",
+                  metodo: t.v === "trasferimento" ? "Trasferimento" : (newMetodi.includes(f.metodo) ? f.metodo : newMetodi[0]),
+                  note: newNote
+                };
+              });
+            }} 
+            className={`flex-1 py-1.5 rounded-lg text-sm transition-all ${form.tipo === t.v ? "bg-white/15 text-white" : "text-slate-400"}`}
+          >
+            {t.l}
+          </button>
         ))}
       </div>
       {isTr && <p className="text-[11px] text-slate-500 mb-3 -mt-1">Sposta denaro tra i tuoi conti: non conta come spesa né come entrata, e il patrimonio totale resta invariato.</p>}
@@ -8440,32 +8508,74 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
           <Input placeholder="Descrizione spesa…" value={form.note} onChange={(e) => set("note", e.target.value)} autoFocus />
         </div>
         
-        {/* IMPORTO E TAG AFFIANCATI */}
-        <div className={`grid gap-3 ${isTr ? "grid-cols-1" : "grid-cols-2"}`}>
-          <div className="min-w-0">
+        {/* IMPORTO E DATA AFFIANCATI */}
+        <div className="flex w-full gap-3">
+          <div className="flex-1 min-w-0">
             <Label>Importo</Label>
-            <Input type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.importo} onChange={(e) => set("importo", e.target.value)}/>
+            <Input 
+              type="number" 
+              inputMode="decimal" 
+              step="0.01" 
+              placeholder="0,00" 
+              value={form.importo} 
+              onChange={(e) => set("importo", e.target.value)}
+              style={{ width: "100%", minWidth: 0 }}
+            />
           </div>
-          {!isTr && (
-            <div className="min-w-0">
-              <Label>Tag</Label>
-              <Input placeholder="es. vacanza..." value={form.tags} onChange={(e) => set("tags", e.target.value)} />
-            </div>
-          )}
+          <div className="flex-1 min-w-0">
+            <Label>Data</Label>
+            <Input 
+              type="date" 
+              value={form.data} 
+              onChange={(e) => set("data", e.target.value)} 
+              style={{ width: "100%", minWidth: 0, paddingLeft: "8px", paddingRight: "8px" }} 
+            />
+          </div>
         </div>
-        
-        {/* DATA (Riga singola: risolve il bug di iOS) */}
-        <div>
-          <Label>Data</Label>
-          <Input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} />
-        </div>
-        
+
         {isTr ? (
           <>
             {/* TRASFERIMENTI: CONTI AFFIANCATI */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="min-w-0"><Label>Dal conto</Label><Select value={form.conto} onChange={(e) => set("conto", e.target.value)}>{data.accounts.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</Select></div>
-              <div className="min-w-0"><Label>Al conto</Label><Select value={form.contoDest} onChange={(e) => set("contoDest", e.target.value)}>{data.accounts.filter((a) => a.id !== form.conto).map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</Select></div>
+              <div className="min-w-0">
+                <Label>Dal conto</Label>
+                <Select 
+                  value={form.conto} 
+                  onChange={(e) => {
+                    const nuovoConto = e.target.value;
+                    setForm((f) => {
+                      let nuovoContoDest = f.contoDest;
+                      
+                      // Controllo anti-conflitto: se il nuovo conto origine è uguale a quello di destinazione,
+                      // spostiamo automaticamente la destinazione sul primo conto disponibile.
+                      if (nuovoConto === f.contoDest) {
+                        nuovoContoDest = data.accounts.find((a) => a.id !== nuovoConto)?.id || "";
+                      }
+                      
+                      return { 
+                        ...f, 
+                        conto: nuovoConto, 
+                        contoDest: nuovoContoDest,
+                        note: getTransferNote(nuovoConto, nuovoContoDest) 
+                      };
+                    });
+                  }}
+                >
+                  {data.accounts.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                </Select>
+              </div>
+              <div className="min-w-0">
+                <Label>Al conto</Label>
+                <Select 
+                  value={form.contoDest} 
+                  onChange={(e) => {
+                    const nuovoContoDest = e.target.value;
+                    setForm((f) => ({ ...f, contoDest: nuovoContoDest, note: getTransferNote(f.conto, nuovoContoDest) }));
+                  }}
+                >
+                  {data.accounts.filter((a) => a.id !== form.conto).map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                </Select>
+              </div>
             </div>
           </>
         ) : (
@@ -8473,7 +8583,12 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
             {/* CONTO E METODO AFFIANCATI */}
             <div className="grid grid-cols-2 gap-3">
               <div className="min-w-0"><Label>Conto</Label><Select value={form.conto} onChange={(e) => set("conto", e.target.value)}>{data.accounts.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}</Select></div>
-              <div className="min-w-0"><Label>Metodo</Label><Select value={form.metodo} onChange={(e) => set("metodo", e.target.value)}>{["Carta", "Contanti", "Bonifico", "Addebito", "Altro"].map((m) => <option key={m}>{m}</option>)}</Select></div>
+              <div className="min-w-0">
+                <Label>Metodo</Label>
+                <Select value={form.metodo} onChange={(e) => set("metodo", e.target.value)}>
+                  {metodiAttuali.map((m) => <option key={m}>{m}</option>)}
+                </Select>
+              </div>
             </div>
             
             {/* CATEGORIA */}
@@ -8522,6 +8637,11 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
                 </Select>
               </div>
             )}
+
+            <div className="min-w-0">
+              <Label>Tag</Label>
+              <Input placeholder="es. vacanza..." value={form.tags} onChange={(e) => set("tags", e.target.value)} />
+            </div>
           </>
         )}
       </div>
