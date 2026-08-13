@@ -1125,16 +1125,63 @@ function App() {
     notify(tx.tipo === "trasferimento" ? "Trasferimento salvato" : tx.tipo === "entrata" ? "Entrata salvata" : "Spesa salvata");
   };
 
-  const softDelete = (id) => setConfirmDlg({
-    msg: "Spostare questo movimento nel cestino? Potrai ripristinarlo in qualsiasi momento.",
-    onOk: () => { update((d) => { const t = d.transactions.find((x) => x.id === id); if (t) t.deletedAt = new Date().toISOString(); return d; }); notify("Spostato nel cestino"); },
-  });
+  const softDelete = (id) => {
+    // 1. Questa è l'azione reale che sposta l'elemento nel cestino
+    const doDelete = () => {
+      update((d) => { 
+        const t = d.transactions.find((x) => x.id === id); 
+        if (t) t.deletedAt = new Date().toISOString(); 
+        return d; 
+      }); 
+      notify("Spostato nel cestino");
+    };
+
+    // 2. Riconosciamo se siamo su un dispositivo Apple (iPhone o iPad)
+    const isIOS = typeof navigator !== 'undefined' && 
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    // 3. Il bivio: popup di sistema per iOS, modale custom per PC
+    if (isIOS) {
+      if (window.confirm("Spostare questo movimento nel cestino? Potrai ripristinarlo in qualsiasi momento.")) {
+        doDelete();
+      }
+    } else {
+      setConfirmDlg({
+        msg: "Spostare questo movimento nel cestino? Potrai ripristinarlo in qualsiasi momento.",
+        onOk: doDelete,
+      });
+    }
+  };
 
   const restoreTx = (id) => { update((d) => { const t = d.transactions.find((x) => x.id === id); if (t) delete t.deletedAt; return d; }); notify("Movimento ripristinato"); };
-  const hardDelete = (id) => setConfirmDlg({
-    msg: "Eliminare definitivamente? Questa azione non è reversibile.",
-    onOk: () => { update((d) => { d.transactions = d.transactions.filter((x) => x.id !== id); return d; }); notify("Eliminato definitivamente"); },
-  });
+  const hardDelete = (id) => {
+    // 1. L'azione reale che elimina definitivamente il movimento
+    const doDelete = () => {
+      update((d) => { 
+        d.transactions = d.transactions.filter((x) => x.id !== id); 
+        return d; 
+      }); 
+      notify("Eliminato definitivamente");
+    };
+
+    // 2. Riconosciamo se siamo su un dispositivo Apple (iPhone o iPad)
+    const isIOS = typeof navigator !== 'undefined' && 
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    const messaggio = "Eliminare definitivamente? Questa azione non è reversibile.";
+
+    // 3. Il bivio: popup di sistema per iOS, modale custom per PC
+    if (isIOS) {
+      if (window.confirm(messaggio)) {
+        doDelete();
+      }
+    } else {
+      setConfirmDlg({
+        msg: messaggio,
+        onOk: doDelete,
+      });
+    }
+  };
 
   /* ---------- Backup / Export / Import ---------- */
   const [backups, setBackups] = useState([]);
@@ -1476,8 +1523,7 @@ function App() {
       )}
 
       {/* Modali */}
-      <TxModal open={!!txModal} tx={txModal} onClose={() => setTxModal(null)} onSave={saveTx} data={data} setCatEditor={setCatEditor} />
-      <CatModal open={!!catEditor} cat={catEditor?.cat} prefillName={catEditor?.prefillName} prefillGroup={catEditor?.prefillGroup} onClose={() => setCatEditor(null)} data={data} update={update} notify={notify} setConfirmDlg={setConfirmDlg} onSaved={(id) => { catEditor?.onDone?.(id); setCatEditor(null); }} />
+      <TxModal open={!!txModal} tx={txModal} onClose={() => setTxModal(null)} onSave={saveTx} data={data} setCatEditor={setCatEditor} onDelete={softDelete} />      <CatModal open={!!catEditor} cat={catEditor?.cat} prefillName={catEditor?.prefillName} prefillGroup={catEditor?.prefillGroup} onClose={() => setCatEditor(null)} data={data} update={update} notify={notify} setConfirmDlg={setConfirmDlg} onSaved={(id) => { catEditor?.onDone?.(id); setCatEditor(null); }} />
       <Modal open={!!confirmDlg} onClose={() => setConfirmDlg(null)} title="Conferma">
         <p className="text-sm text-slate-300 mb-5">{confirmDlg?.msg}</p>
         <div className="modal-actions flex gap-3 justify-end">
@@ -1906,11 +1952,15 @@ function Dashboard({ patrimonio, isCurrentMonth, selMonth, setSelMonth, deltaMes
 }
 
 
-const TxRow = memo(function TxRow({ t, c, contoNome, contoDestNome, onEdit, onDelete, compact, i }) {
+const TxRow = memo(function TxRow({ t, c, contoNome, contoDestNome, onEdit, compact, i }) {
   const isIn = t.tipo === "entrata";
   const isTr = t.tipo === "trasferimento";
   return (
-    <div className="group flex items-center gap-3 py-2.5 px-1 rounded-lg hover:bg-white/[0.04] transition-colors" style={{ animation: `fadeUp .4s both`, animationDelay: `${Math.min(i, 12) * 35}ms` }}>
+    <div 
+      onClick={() => onEdit(t)} 
+      className="group flex items-center gap-3 py-2.5 px-1 rounded-lg cursor-pointer hover:bg-white/[0.06] active:bg-white/10 transition-colors" 
+      style={{ animation: `fadeUp .4s both`, animationDelay: `${Math.min(i, 12) * 35}ms` }}
+    >
       <div className="w-9 h-9 rounded-xl grid place-items-center text-base shrink-0" style={{ background: (c?.colore || "#94A3B8") + "1f", border: `1px solid ${(c?.colore || "#94A3B8")}33` }}>
         {isTr ? "⇄" : c?.icona || "•"}
       </div>
@@ -1919,12 +1969,6 @@ const TxRow = memo(function TxRow({ t, c, contoNome, contoDestNome, onEdit, onDe
         <p className="text-xs text-slate-500 truncate">{[isTr ? `${contoNome || "?"} → ${contoDestNome || "?"}` : c ? c.nome + (t.sottocategoria ? " › " + t.sottocategoria : "") : null, !isTr ? contoNome : null, fmtDate(t.data)].filter(Boolean).join(" · ")}</p>
       </div>
       <span className={`text-sm tabular-nums font-medium shrink-0 whitespace-nowrap ${isIn ? "text-emerald-300" : isTr ? "text-slate-400" : "text-slate-200"}`}>{isIn ? "+" : isTr ? "" : "−"}{eur(t.importo)}</span>
-      {!compact && (
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(t)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 transition-all">✎</button>
-          <button onClick={() => onDelete(t.id)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-rose-500/20 text-xs text-slate-300 hover:text-rose-300 transition-all">🗑</button>
-        </div>
-      )}
     </div>
   );
 });
@@ -8395,7 +8439,7 @@ function CategoryPicker({ data, value, tipoEntrata, onSelect, onEditCat, onCreat
   );
 }
 
-function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
+function TxModal({ open, tx, onClose, onSave, data, setCatEditor, onDelete }) {
   const isEdit = !!tx?.id;
   const [form, setForm] = useState(null);
   
@@ -8645,9 +8689,28 @@ function TxModal({ open, tx, onClose, onSave, data, setCatEditor }) {
           </>
         )}
       </div>
-      <div className="modal-actions flex justify-end gap-3 mt-5">
-        <BtnGhost onClick={onClose}>Annulla</BtnGhost>
-        <BtnPrimary onClick={submit}>{isEdit ? "Salva modifiche" : isTr ? "Trasferisci" : "Aggiungi"}</BtnPrimary>
+      {/* SEZIONE PULSANTI MODIFICATA */}
+      <div className="modal-actions flex justify-between items-center mt-5 w-full">
+        <div>
+          {/* Mostra Elimina solo se stiamo modificando un movimento esistente */}
+          {isEdit && (
+            <button 
+              onClick={() => {
+                if (window.confirm("Vuoi davvero eliminare questo movimento?")) {
+                  onDelete(tx.id);
+                  onClose();
+                }
+              }} 
+              className="text-sm text-rose-400 hover:text-rose-300 transition-colors px-2 py-1"
+            >
+              Elimina
+            </button>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <BtnGhost onClick={onClose}>Annulla</BtnGhost>
+          <BtnPrimary onClick={submit}>{isEdit ? "Salva modifiche" : isTr ? "Trasferisci" : "Aggiungi"}</BtnPrimary>
+        </div>
       </div>
     </Modal>
   );
